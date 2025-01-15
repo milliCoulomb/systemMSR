@@ -101,4 +101,10 @@ output:
         let result = parse_input_deck(file_path.to_str().unwrap());
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_parse_input_deck_file_not_found() {
+        let result = parse_input_deck("non_existent_file.yaml");
+        assert!(result.is_err());
+    }
 }
