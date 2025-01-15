@@ -44,7 +44,7 @@ pub struct ThermalHydraulics {
     pub secondary_fluid: FluidProperties,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PumpSchedule {
     pub time: Vec<f64>,                   // [s]
     pub flow_rate: Vec<f64>,              // [m^3/s] or [kg/s]
