@@ -9,10 +9,12 @@ import logging
 class ThermoHydraulicsState:
     temperature: np.ndarray
     flow_rate: float  # Mass flow rate [kg/s]
+    T_in: float  # Inlet temperature [K]
 
 @dataclass
 class NeutronicsState:
-    phi: np.ndarray  # Neutron flux [n/cm^2-s]
-    C: np.ndarray  # Delayed neutron precursors concentration [n/cm^3]
+    phi: np.ndarray  # Neutron flux [n/m^2-s]
+    C: np.ndarray  # Delayed neutron precursors concentration [n/m^3]
     keff: float  # Effective multiplication factor
     power: float  # Power [W]
+    power_density: np.ndarray  # Power density [W/m^3]
