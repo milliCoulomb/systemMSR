@@ -35,6 +35,8 @@ class NuclearDataModel(BaseModel):
     nu_fission: float
     beta: float
     decay_constant: float
+    kappa: float
+    power: float
 
 class GeometryModel(BaseModel):
     core_length: float
