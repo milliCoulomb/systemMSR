@@ -60,8 +60,7 @@ def main():
     neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
     # initial temperature distribution
     core_state = ThermoHydraulicsState(
-        core_temperature=np.ones_like(core_geom.dx) * 900.0,
-        secondary_temperature=np.ones_like(core_geom.dx) * 300.0,
+        temperature=np.ones_like(core_geom.dx) * 900.0,
         flow_rate=10.0,
     )
     velocity = core_state.flow_rate / (input_deck.materials.primary_salt["density"] * np.pi * core_geom.core_radius ** 2)
