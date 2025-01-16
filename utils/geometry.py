@@ -13,17 +13,26 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CoreGeometry:
     core_length: float
-    exchange_length: float
+    exchanger_length: float
     core_radius: float
     n_cells_core: int
     n_cells_exchanger: int
 
+    def __post_init__(self):
+        self.dx_core = self.core_length / self.n_cells_core
+        self.dx_exchanger = self.exchanger_length / self.n_cells_exchanger
+        self.dx = np.array(
+            [self.dx_core] * self.n_cells_core
+            + [self.dx_exchanger] * self.n_cells_exchanger
+        )
+
+
 @dataclass
 class SecondaryLoopGeometry:
     first_loop_length: float
-    exchange_length: float
+    exchanger_length: float
     second_loop_length: float
     loop_radius: float
     n_cells_first_loop: int
-    n_cells_exchange: int
+    n_cells_exchanger: int
     n_cells_second_loop: int
