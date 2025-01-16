@@ -2,10 +2,12 @@
 import numpy as np
 from parsers.input_parser import InputDeck
 from physics.neutronics import NeutronicsSolver, NeutronicsParameters
+from physics.thermo import ThermoHydraulicsParameters, ThermoHydraulicsSolver
 from methods.fvm import FVM
 from utils.geometry import CoreGeometry
-from physics.thermo import ThermoHydraulicsState, ThermoHydraulicsParameters
+from physics.thermo import ThermoHydraulicsParameters
 import matplotlib.pyplot as plt
+from utils.states import ThermoHydraulicsState, NeutronicsState
 
 
 def main():
@@ -62,6 +64,12 @@ def main():
     core_state = ThermoHydraulicsState(
         temperature=np.ones_like(core_geom.dx) * 900.0,
         flow_rate=10.0,
+        T_in=0.0,
+    )
+    secondary_state = ThermoHydraulicsState(
+        temperature=np.ones_like(core_geom.dx) * 900.0,
+        flow_rate=10.0,
+        T_in=920.0,
     )
     velocity = core_state.flow_rate / (input_deck.materials.primary_salt["density"] * np.pi * core_geom.core_radius ** 2)
     print(f"Velocity: {velocity}")
@@ -72,6 +80,13 @@ def main():
         k=input_deck.materials.primary_salt["k"],
         heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
         expansion_coefficient=input_deck.materials.primary_salt["expansion"],
+    )
+    th_params_secondary = ThermoHydraulicsParameters(
+        rho=input_deck.materials.secondary_salt["density"],
+        cp=input_deck.materials.secondary_salt["cp"],
+        k=input_deck.materials.secondary_salt["k"],
+        heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
+        expansion_coefficient=input_deck.materials.secondary_salt["expansion"],
     )
     # solve the neutronics problem
     final_state = neut_solver.solve_static(core_state, th_params)
@@ -90,6 +105,8 @@ def main():
     plt.title("Precursor Concentration Distribution")
     plt.show()
     print(f'keff: {final_state.keff}')
+
+
 
 
 
