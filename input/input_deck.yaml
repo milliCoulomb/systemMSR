@@ -5,16 +5,16 @@ simulation:
   time_step: 0.01            # [s] base time-step
 
 geometry:
-  core_length: 2.0           # [m] length of the core region
-  exchanger_length: 1.0      # [m] length of the heat exchanger
-  core_radius: 1.0           # [m] radius of the core region
+  core_length: 3.0           # [m] length of the core region
+  exchanger_length: 3.0      # [m] length of the heat exchanger
+  core_radius: 1.0e-1           # [m] radius of the core region
   cooling_loop_first_length: 5.0  # [m] length of primary loop
   # then comes the heat exchanger and then the second segment of the cooling loop
   cooling_loop_second_length: 5.0 # [m] length of secondary loop
   secondary_loop_radius: 1.0 # [m] radius of the secondary loop
   heat_exchanger_coefficient: 1.0 # [W/m^3-K] heat transfer coefficient in heat exchanger
-  n_core: 20                 # number of 1D cells in core
-  n_exchanger: 10            # number of 1D cells in heat exchanger
+  n_core: 300                 # number of 1D cells in core
+  n_exchanger: 300            # number of 1D cells in heat exchanger
   n_cooling_loop_first_segment: 50  # number of 1D cells in secondary loop, before heat exchanger
   n_cooling_loop_second_segment: 50 # number of 1D cells in secondary loop, after heat exchanger
 
@@ -24,9 +24,11 @@ materials:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
     expansion: 2.12e-4             # [per kelvin], constant
+    k:         0.5                 # [W/m-K], constant
   secondary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
+    k:         0.5                 # [W/m-K], constant
 
 nuclear_data:
   diffusion_coefficient: 1.21e-2      # [m]   e.g. D
