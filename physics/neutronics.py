@@ -25,6 +25,8 @@ class NeutronicsParameters:
     nu_fission: float  # Average neutrons per fission
     beta: float  # Delayed neutron fraction
     Lambda: float  # Decay constant [1/s]
+    kappa: float  # energy release per fission [J]
+    power: float # Power [W]
 
 
 @dataclass
@@ -32,6 +34,7 @@ class NeutronicsState:
     phi: np.ndarray  # Neutron flux [n/cm^2-s]
     C: np.ndarray  # Delayed neutron precursors concentration [n/cm^3]
     keff: float  # Effective multiplication factor
+    power: float  # Power [W]
 
 
 class NeutronicsSolver:
@@ -120,6 +123,21 @@ class NeutronicsSolver:
         logger.debug("Matrix assembled for the eigenvalue problem.")
         return LHS_mat, RHS_mat
     
+    def flux_normalization(self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> NeutronicsState:
+        """
+        Normalize the neutron flux distribution to the power.
+        """
+        # calculate the power
+        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        mask = np.concatenate([np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)])
+        sigma_f = sigma_f * mask
+        power = np.sum(neut_state.phi * sigma_f) * np.pi * self.geom.core_radius**2 * self.params.kappa
+        # normalize the flux
+        phi = neut_state.phi * self.params.power / power
+        C = neut_state.C * self.params.power / power
+        logger.debug("Neutron flux normalized.")
+        return NeutronicsState(phi=phi, C=C, keff=neut_state.keff, power=power)
+    
     def solve_static(
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
     ) -> NeutronicsState:
@@ -142,5 +160,5 @@ class NeutronicsSolver:
         phi = np.real(eigvecs[: self.n_cells, -1])
         C = np.real(eigvecs[self.n_cells :, -1])
         logger.debug("Eigenvalue problem solved.")
-        return NeutronicsState(phi=phi, C=C, keff=eigvals[-1].real)
+        return self.flux_normalization(NeutronicsState(phi=phi, C=C, keff=eigvals[-1], power=self.params.power), th_state, th_params)
         
