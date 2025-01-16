@@ -18,6 +18,7 @@ class ThermoHydraulicsParameters:
     cp: float   # Specific heat [J/kg-K]
     k: float    # Thermal conductivity [W/m-K]
     heat_exchanger_coefficient: float  # [W/m^3-K]
+    expansion_coefficient: float  # [1/K]
 
 @dataclass
 class ThermoHydraulicsState:
