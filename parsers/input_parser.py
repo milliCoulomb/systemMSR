@@ -5,6 +5,7 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel, ValidationError, validator
 import bisect
+import numpy as np
 
 class SchedulePointModel(BaseModel):
     time: float
@@ -89,15 +90,15 @@ class InputDeck:
     
     def get_pump_flow_rate(self, pump: PumpModel, current_time: float) -> float:
         """Interpolate the flow rate for a given pump at the current time."""
-        times = [point.time for point in pump.schedule]
-        rates = [point.flow_rate for point in pump.schedule]
+        times = np.array([point.time for point in pump.schedule])
+        rates = np.array([point.flow_rate for point in pump.schedule])
         
         if current_time <= times[0]:
             return rates[0]
         elif current_time >= times[-1]:
             return rates[-1]
         else:
-            idx = bisect.bisect_right(times, current_time) - 1
+            idx = np.searchsorted(times, current_time) - 1
             t1, t2 = times[idx], times[idx + 1]
             r1, r2 = rates[idx], rates[idx + 1]
             # Linear interpolation
@@ -106,15 +107,15 @@ class InputDeck:
     def get_secondary_inlet_temp(self, current_time: float) -> float:
         """Interpolate the secondary inlet temperature at the current time."""
         schedule = self.operational_parameters.secondary_inlet_temp.schedule
-        times = [point.time for point in schedule]
-        temps = [point.temperature for point in schedule]
+        times = np.array([point.time for point in schedule])
+        temps = np.array([point.temperature for point in schedule])
         
         if current_time <= times[0]:
             return temps[0]
         elif current_time >= times[-1]:
             return temps[-1]
         else:
-            idx = bisect.bisect_right(times, current_time) - 1
+            idx = np.searchsorted(times, current_time) - 1
             t1, t2 = times[idx], times[idx + 1]
             temp1, temp2 = temps[idx], temps[idx + 1]
             # Linear interpolation
