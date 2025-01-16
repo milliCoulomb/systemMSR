@@ -79,6 +79,8 @@ class ThermoHydraulicsSolver:
         adv_secondary = self.method.build_grad(
             th_state_secondary.flow_rate * self.params_secondary.cp * np.ones(self.n_cells_secondary)
         )
+        # kill periodicity by removing the last element of the first line
+        adv_secondary[0, -1] = 0
         # diffusion for the secondary loop
         diff_secondary = self.method.build_stif(
             self.params_secondary.k
@@ -86,6 +88,9 @@ class ThermoHydraulicsSolver:
             * self.secondary_geom.loop_radius**2
             * np.pi
         )
+        # kill periodicity by removing the last element of the first line and the first element of the last line
+        diff_secondary[0, -1] = 0
+        diff_secondary[-1, 0] = 0
         # heat exchanger term, mask because it only applies to the exchanger in the secondary loop, so after n_cells_first_loop and before n_cells_first_loop + n_cells_exchanger
         heat_exchange_secondary = (
             np.concatenate(
@@ -113,9 +118,20 @@ class ThermoHydraulicsSolver:
         """
         # assemble the matrix
         LHS = self.assemble_matrix_static(th_state_primary, th_state_secondary)
+        exchanger_primary = np.concatenate(
+            [np.zeros(self.core_geom.n_cells_core), np.ones(self.core_geom.n_cells_exchanger)]
+        ) * self.params_primary.heat_exchanger_coefficient * (self.core_geom.core_radius**2 * np.pi) * th_state_secondary.T_in
+        exchanger_secondary = np.concatenate(
+            [np.zeros(self.secondary_geom.n_cells_first_loop), np.ones(self.secondary_geom.n_cells_exchanger), np.zeros(self.secondary_geom.n_cells_second_loop)]
+        ) * self.params_secondary.heat_exchanger_coefficient * (self.secondary_geom.loop_radius**2 * np.pi) * th_state_secondary.T_in
+        rhs_vector = np.concatenate(
+            [neutronic_state.power_density + exchanger_primary, -exchanger_secondary]
+        )
         # solve the linear system
-        T = spla.spsolve(LHS, np.zeros_like(th_state_primary.core_temperature))
+        T = spla.spsolve(LHS, rhs_vector)
         logger.debug("Static thermo-hydraulic problem solved.")
-        return T
+        th_state_primary.temperature = T[:self.n_cells_primary]
+        th_state_secondary.temperature = T[self.n_cells_primary:]
+        return th_state_primary, th_state_secondary
 
 
