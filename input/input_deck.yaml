@@ -28,6 +28,7 @@ materials:
   secondary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
+    expansion: 2.12e-4             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
 
 nuclear_data:
