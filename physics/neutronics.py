@@ -6,11 +6,11 @@ import numpy as np
 from scipy.sparse import diags
 from scipy.sparse import bmat
 import scipy.sparse.linalg as spla
-from parsers.input_parser import InputDeck
 import logging
 import methods.method as Method
 from utils.geometry import CoreGeometry
-from physics.thermo import ThermoHydraulicsState, ThermoHydraulicsParameters
+from utils.states import ThermoHydraulicsState, NeutronicsState
+from physics.thermo import ThermoHydraulicsParameters
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,14 +27,6 @@ class NeutronicsParameters:
     Lambda: float  # Decay constant [1/s]
     kappa: float  # energy release per fission [J]
     power: float # Power [W]
-
-
-@dataclass
-class NeutronicsState:
-    phi: np.ndarray  # Neutron flux [n/cm^2-s]
-    C: np.ndarray  # Delayed neutron precursors concentration [n/cm^3]
-    keff: float  # Effective multiplication factor
-    power: float  # Power [W]
 
 
 class NeutronicsSolver:
@@ -64,12 +56,12 @@ class NeutronicsSolver:
         rho = th_params.rho
         alpha = th_params.expansion_coefficient
         T_ref = 922.0 * np.ones_like(self.dx)
-        if len(th_state.core_temperature) != len(self.dx):
+        if len(th_state.temperature) != len(self.dx):
             raise ValueError("Temperature profile and geometry mismatch.")
         # calculate the temperature-dependent cross sections
-        Sigma_a = self.params.Sigma_a * (1 - alpha * (th_state.core_temperature - T_ref))
-        Sigma_f = self.params.Sigma_f * (1 - alpha * (th_state.core_temperature - T_ref))
-        D = self.params.D * (1 + alpha * (th_state.core_temperature - T_ref))
+        Sigma_a = self.params.Sigma_a * (1 - alpha * (th_state.temperature - T_ref))
+        Sigma_f = self.params.Sigma_f * (1 - alpha * (th_state.temperature - T_ref))
+        D = self.params.D * (1 + alpha * (th_state.temperature - T_ref))
         logger.debug("Nuclear parameters updated based on temperature.")
         return Sigma_a, Sigma_f, D
 
