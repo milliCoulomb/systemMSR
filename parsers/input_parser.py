@@ -15,10 +15,13 @@ class PumpModel(BaseModel):
     mode: str
     schedule: List[SchedulePointModel]
 
+class SecondaryInletTempModel(BaseModel):
+    schedule: List[SchedulePointModel]
+
 class OperationalParametersModel(BaseModel):
     pump_primary: PumpModel
     pump_secondary: PumpModel
-    secondary_inlet_temp: List[SchedulePointModel]
+    secondary_inlet_temp: SecondaryInletTempModel
 
 class MaterialsModel(BaseModel):
     primary_salt: dict
@@ -102,7 +105,7 @@ class InputDeck:
     
     def get_secondary_inlet_temp(self, current_time: float) -> float:
         """Interpolate the secondary inlet temperature at the current time."""
-        schedule = self.operational_parameters.secondary_inlet_temp
+        schedule = self.operational_parameters.secondary_inlet_temp.schedule
         times = [point.time for point in schedule]
         temps = [point.temperature for point in schedule]
         
