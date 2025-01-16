@@ -127,8 +127,9 @@ class NeutronicsSolver:
         # normalize the flux
         phi = neut_state.phi * self.params.power / power
         C = neut_state.C * self.params.power / power
+        power_density = phi * sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2
         logger.debug("Neutron flux normalized.")
-        return NeutronicsState(phi=phi, C=C, keff=neut_state.keff, power=power)
+        return NeutronicsState(phi=phi, C=C, keff=neut_state.keff, power=power, power_density=power_density)
     
     def solve_static(
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
@@ -152,5 +153,5 @@ class NeutronicsSolver:
         phi = np.real(eigvecs[: self.n_cells, -1])
         C = np.real(eigvecs[self.n_cells :, -1])
         logger.debug("Eigenvalue problem solved.")
-        return self.flux_normalization(NeutronicsState(phi=phi, C=C, keff=eigvals[-1], power=self.params.power), th_state, th_params)
+        return self.flux_normalization(NeutronicsState(phi=phi, C=C, keff=eigvals[-1], power=self.params.power, power_density=np.zeros_like(phi)), th_state, th_params)
         
