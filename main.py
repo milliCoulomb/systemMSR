@@ -53,6 +53,8 @@ def main():
         nu_fission=nuc.nu_fission,
         beta=nuc.beta,
         Lambda=nuc.decay_constant,
+        kappa=nuc.kappa,
+        power=nuc.power,
     )
     fvm = FVM(core_geom.dx)
     neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
