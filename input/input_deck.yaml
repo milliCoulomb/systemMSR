@@ -37,6 +37,8 @@ nuclear_data:
   nu_fission: 2.4                # average number of neutrons per fission
   beta: 650e-5                   # delayed neutron fraction
   decay_constant: 0.1           # [1/s] decay constant of precursor
+  power: 1.0e6            # [W] target power of the reactor
+  kappa: 3.2e-11                 # Joules per fission
 
 operational_parameters:
   pump_primary:
