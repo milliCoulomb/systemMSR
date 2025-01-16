@@ -36,3 +36,13 @@ class SecondaryLoopGeometry:
     n_cells_first_loop: int
     n_cells_exchanger: int
     n_cells_second_loop: int
+
+    def __post_init__(self):
+        self.dx_first_loop = self.first_loop_length / self.n_cells_first_loop
+        self.dx_exchanger = self.exchanger_length / self.n_cells_exchanger
+        self.dx_second_loop = self.second_loop_length / self.n_cells_second_loop
+        self.dx = np.array(
+            [self.dx_first_loop] * self.n_cells_first_loop
+            + [self.dx_exchanger] * self.n_cells_exchanger
+            + [self.dx_second_loop] * self.n_cells_second_loop
+        )
