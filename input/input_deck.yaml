@@ -1,0 +1,64 @@
+# input_deck.yaml
+
+simulation:
+  total_time: 100.0          # [s] total simulation time
+  time_step: 0.01            # [s] base time-step
+
+geometry:
+  core_length: 2.0           # [m] length of the core region
+  exchanger_length: 1.0      # [m] length of the heat exchanger
+  core_radius: 1.0           # [m] radius of the core region
+  cooling_loop_first_length: 5.0  # [m] length of primary loop
+  # then comes the heat exchanger and then the second segment of the cooling loop
+  cooling_loop_second_length: 5.0 # [m] length of secondary loop
+  secondary_loop_radius: 1.0 # [m] radius of the secondary loop
+  heat_exchanger_coefficient: 1.0 # [W/m^3-K] heat transfer coefficient in heat exchanger
+  n_core: 20                 # number of 1D cells in core
+  n_exchanger: 10            # number of 1D cells in heat exchanger
+  n_cooling_loop_first_segment: 50  # number of 1D cells in secondary loop, before heat exchanger
+  n_cooling_loop_second_segment: 50 # number of 1D cells in secondary loop, after heat exchanger
+
+
+materials:
+  primary_salt:
+    density:   2250.0              # [kg/m^3], constant
+    cp:        1967.0              # [J/kg-K], constant
+    expansion: 2.12e-4             # [per kelvin], constant
+  secondary_salt:
+    density:   2250.0              # [kg/m^3], constant
+    cp:        1967.0              # [J/kg-K], constant
+
+nuclear_data:
+  diffusion_coefficient: 1.21e-2      # [m]   e.g. D
+  absorption_cross_section: 3.76e-1  # [1/m] e.g. Sigma_a
+  fission_cross_section: 1.85e-1     # [1/m] e.g. Sigma_f
+  nu_fission: 2.4                # average number of neutrons per fission
+  beta: 650e-5                   # delayed neutron fraction
+  decay_constant: 0.1           # [1/s] decay constant of precursor
+
+operational_parameters:
+  pump_primary:
+    mode: "flow_rate_control"
+    # flow rate should be linearly interpolated between the given points
+    schedule:
+      - time: 0.0
+        flow_rate: 10.0           # kg/s
+      - time: 50.0
+        flow_rate: 20.0           # kg/s
+      - time: 80.0
+        flow_rate: 5.0            # kg/s
+  
+  pump_secondary:
+    mode: "flow_rate_control"
+    schedule:
+      - time: 0.0
+        flow_rate: 5.0            # kg/s
+      - time: 70.0
+        flow_rate: 10.0           # kg/s
+
+  secondary_inlet_temp:
+    schedule:
+      - time: 0.0
+        temperature: 400.0        # [K]
+      - time: 60.0
+        temperature: 450.0        # [K]
