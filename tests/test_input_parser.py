@@ -148,6 +148,44 @@ class TestInputParser(unittest.TestCase):
         
         with self.assertRaises(ValidationError):
             InputDeckModel(**mock_data)
+    
+    def test_get_pump_flow_rate(self):
+        input_deck_path = 'input/input_deck.yaml'
+        input_deck = InputDeck.from_yaml(input_deck_path)
+        
+        # Test at a time within the schedule range
+        flow_rate = input_deck.get_pump_flow_rate(input_deck.operational_parameters.pump_primary, 25.0)
+        expected_flow_rate = 15.0  # Linear interpolation between 10.0 at t=0 and 20.0 at t=50
+        self.assertAlmostEqual(flow_rate, expected_flow_rate)
+        
+        # Test at the start of the schedule
+        flow_rate = input_deck.get_pump_flow_rate(input_deck.operational_parameters.pump_primary, 0.0)
+        expected_flow_rate = 10.0
+        self.assertEqual(flow_rate, expected_flow_rate)
+        
+        # Test at the end of the schedule
+        flow_rate = input_deck.get_pump_flow_rate(input_deck.operational_parameters.pump_primary, 80.0)
+        expected_flow_rate = 5.0
+        self.assertEqual(flow_rate, expected_flow_rate)
+
+    def test_get_secondary_inlet_temp(self):
+        input_deck_path = 'input/input_deck.yaml'
+        input_deck = InputDeck.from_yaml(input_deck_path)
+        
+        # Test at a time within the schedule range
+        temp = input_deck.get_secondary_inlet_temp(30.0)
+        expected_temp = 425.0  # Linear interpolation between 400.0 at t=0 and 450.0 at t=60
+        self.assertAlmostEqual(temp, expected_temp)
+        
+        # Test at the start of the schedule
+        temp = input_deck.get_secondary_inlet_temp(0.0)
+        expected_temp = 400.0
+        self.assertEqual(temp, expected_temp)
+        
+        # Test at the end of the schedule
+        temp = input_deck.get_secondary_inlet_temp(60.0)
+        expected_temp = 450.0
+        self.assertEqual(temp, expected_temp)
 
 if __name__ == '__main__':
     unittest.main()
