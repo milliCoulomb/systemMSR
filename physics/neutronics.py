@@ -16,6 +16,9 @@ from physics.thermo import ThermoHydraulicsParameters
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# MAGIC CONSTANTS
+THETA = 1.0  # Implicitness parameter
+
 
 @dataclass
 class NeutronicsParameters:
@@ -76,7 +79,7 @@ class NeutronicsSolver:
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
     ) -> np.ndarray:
         """
-        Build the removal operator for the neutron flux. (diffusion + absorption)
+        Build the removal operator for the neutron flux. (diffusion + absorption, or -d_x(D d_x(phi)) + Sigma_a phi)
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
         Sigma_a, _, D = self.update_nuclear_parameters(
@@ -91,7 +94,7 @@ class NeutronicsSolver:
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
     ) -> np.ndarray:
         """
-        Build the removal operator for the delayed neutron precursors. (advection + decay)
+        Build the removal operator for the delayed neutron precursors. (advection + decay or v d_x(C)) + Lambda C)
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
         decay_precursor = self.method.build_mass(self.params.Lambda)
@@ -108,7 +111,7 @@ class NeutronicsSolver:
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
     ) -> np.ndarray:
         """
-        Build the operator for the production of delayed neutron precursors.
+        Build the operator for the production of delayed neutron precursors (nu * Sigma_f * phi * beta).
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
         _, Sigma_f, _ = self.update_nuclear_parameters(
@@ -125,7 +128,7 @@ class NeutronicsSolver:
 
     def build_precursor_decay_op(self) -> np.ndarray:
         """
-        Build the operator for the decay of delayed neutron precursors.
+        Build the operator for the decay of delayed neutron precursors (Lambda).
         """
         decay_precursor = self.method.build_mass(self.params.Lambda)
         logger.debug("Operator built for the decay of delayed neutron precursors.")
@@ -135,7 +138,7 @@ class NeutronicsSolver:
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
     ) -> np.ndarray:
         """
-        Build the operator for the prompt fission neutrons.
+        Build the operator for the prompt fission neutrons (nu * Sigma_f * phi * (1 - beta)).
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
         _, Sigma_f, _ = self.update_nuclear_parameters(
@@ -187,6 +190,23 @@ class NeutronicsSolver:
         RHS_mat = bmat(RHS_blocks)
         logger.debug("Matrix assembled for the eigenvalue problem.")
         return LHS_mat, RHS_mat
+    
+    def assemble_matrix_time_dependent(
+        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
+    ) -> np.ndarray:
+        """
+        Assemble the matrix for the neutron flux and precursor concentration time-dependent problem at a given time step and temperature profile.
+        """
+        # build the operators
+        removal_flux = self.build_removal_op_flux(th_state, th_params) * self.params.neutron_velocity # -d_x(D d_x(phi)) + Sigma_a phi
+        removal_precs = self.build_removal_op_precursor(th_state, th_params) # v d_x(C) + Lambda C
+        decay_precursor = self.build_precursor_decay_op() * self.params.neutron_velocity # Lambda * v
+        precursor_production = self.build_precursor_production_op(th_state, th_params) # nu * Sigma_f * phi * beta
+        fission_flux = self.build_prompt_fission_op(th_state, th_params) * self.params.neutron_velocity # nu * Sigma_f * phi * (1 - beta) * v
+        empty = self.build_empty_op()
+        # assemble the matrices that apply to the vector (phi, C)
+        operator = [[-removal_flux + fission_flux, decay_precursor], [precursor_production, -removal_precs]]
+        return bmat(operator)
 
     def flux_normalization(
         self,
@@ -204,7 +224,7 @@ class NeutronicsSolver:
         )
         sigma_f = sigma_f * mask
         power = (
-            np.sum(neut_state.phi * sigma_f)
+            np.sum(neut_state.phi * sigma_f * self.dx)
             * np.pi
             * self.geom.core_radius**2
             * self.params.kappa
@@ -219,6 +239,23 @@ class NeutronicsSolver:
         return NeutronicsState(
             phi=phi, C=C, keff=neut_state.keff, power=power, power_density=power_density
         )
+    
+    def compute_power(self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> float:
+        """
+        Compute the power from the neutron flux distribution.
+        """
+        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        mask = np.concatenate(
+            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
+        )
+        sigma_f = sigma_f * mask
+        power = (
+            np.sum(neut_state.phi * sigma_f * self.dx)
+            * np.pi
+            * self.geom.core_radius**2
+            * self.params.kappa
+        )
+        return power
 
     def solve_static(
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
@@ -253,3 +290,40 @@ class NeutronicsSolver:
             th_state,
             th_params,
         )
+    
+    def make_neutronic_time_step(
+        self,
+        th_state: ThermoHydraulicsState,
+        th_params: ThermoHydraulicsParameters,
+        neut_state: NeutronicsState,
+        dt: float,
+    ) -> NeutronicsState:
+        """
+        Make a time step for the neutron flux and precursor concentration.
+        """
+        operator = self.assemble_matrix_time_dependent(th_state, th_params)
+        identity = diags(np.ones_like(self.dx), 0, shape=(len(self.dx), len(self.dx)))
+        LHS = identity - THETA * dt * operator
+        RHS = identity + (1 - THETA) * dt * operator
+        # solve the system
+        phi_c_new = spla.spsolve(LHS, RHS @ np.concatenate([neut_state.phi, neut_state.C]))
+        # extract the solution and put it in the state
+        phi_new = phi_c_new[: self.n_cells]
+        C_new = phi_c_new[self.n_cells :]
+        # compute the new power lineic density
+        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi_new
+        new_power = np.sum(pv * self.dx)
+        # initiate a new state
+        new_neut_state = NeutronicsState(
+            phi=phi_new,
+            C=C_new,
+            keff=neut_state.keff,
+            power=new_power,
+            power_density=pv,
+        )
+        logger.debug("Neutronic time step made.")
+        return new_neut_state
+
+
+        
