@@ -27,6 +27,7 @@ class NeutronicsParameters:
     Lambda: float  # Decay constant [1/s]
     kappa: float  # energy release per fission [J]
     power: float  # Power [W]
+    neutron_velocity: float  # Neutron velocity [m/s]
 
 
 class NeutronicsSolver:
