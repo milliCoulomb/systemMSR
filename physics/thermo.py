@@ -173,13 +173,6 @@ class ThermoHydraulicsSolver:
                 diff_secondary + adv_secondary + heat_exchange_secondary,
             ],
         ]
-        # print sizes of the blocks
-        print(f"Size of diff_primary: {diff_primary.shape}")
-        print(f"Size of adv_primary: {adv_primary.shape}")
-        print(f"Size of heat_exchange_primary: {heat_exchange_primary.shape}")
-        print(f"Size of diff_secondary: {diff_secondary.shape}")
-        print(f"Size of adv_secondary: {adv_secondary.shape}")
-        print(f"Size of heat_exchange_secondary: {heat_exchange_secondary.shape}")
         LHS_mat = bmat(LHS_blocks)
         logger.debug("Matrix assembled for the static case.")
         return LHS_mat
