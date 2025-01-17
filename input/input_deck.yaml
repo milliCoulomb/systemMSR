@@ -12,7 +12,7 @@ geometry:
   # then comes the heat exchanger and then the second segment of the cooling loop
   cooling_loop_second_length: 1.5 # [m] length of secondary loop
   secondary_loop_radius: 1.0e-1 # [m] radius of the secondary loop
-  heat_exchanger_coefficient: 5.0e3 # [W/m^3-K] heat transfer coefficient in heat exchanger
+  heat_exchanger_coefficient: 5.0e5 # [W/m^3-K] heat transfer coefficient in heat exchanger
   n_core: 300                 # number of 1D cells in core
   n_exchanger: 300            # number of 1D cells in heat exchanger
   n_cooling_loop_first_segment: 150  # number of 1D cells in secondary loop, before heat exchanger
@@ -23,12 +23,12 @@ materials:
   primary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 2.12e-3             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
   secondary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 2.12e-3             # [per kelvin], constant
     k:         0.005                 # [W/m-K], constant
 
 nuclear_data:
@@ -38,7 +38,7 @@ nuclear_data:
   nu_fission: 2.4                # average number of neutrons per fission
   beta: 650e-5                   # delayed neutron fraction
   decay_constant: 0.1           # [1/s] decay constant of precursor
-  power: 8.0e6            # [W] target power of the reactor
+  power: 8.0e8            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
 
 operational_parameters:
