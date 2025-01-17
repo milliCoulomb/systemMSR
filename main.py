@@ -8,6 +8,7 @@ from utils.geometry import CoreGeometry, SecondaryLoopGeometry
 from physics.thermo import ThermoHydraulicsParameters
 import matplotlib.pyplot as plt
 from utils.states import ThermoHydraulicsState, NeutronicsState
+from couplers.SteadyStateCoupler import SteadyStateCoupler
 
 
 def main():
@@ -73,12 +74,12 @@ def main():
     # initial temperature distribution
     core_state = ThermoHydraulicsState(
         temperature=np.ones_like(core_geom.dx) * 900.0,
-        flow_rate=5.0,
+        flow_rate=100.0,
         T_in=0.0,
     )
     secondary_state = ThermoHydraulicsState(
         temperature=np.ones_like(core_geom.dx) * 900.0,
-        flow_rate=5.0,
+        flow_rate=100.0,
         T_in=800.0,
     )
     velocity = core_state.flow_rate / (
@@ -154,6 +155,32 @@ def main():
     plt.show()
     plt.close()
 
+    # solve the coupled problem
+    coupler = SteadyStateCoupler(th_solver, neut_solver)
+    core_state, secondary_state, neutronic_state = coupler.solve(
+        core_state, secondary_state, final_state
+    )
+    # print the coupled keff
+    print(f"Final keff: {neutronic_state.keff}")
+    # plot the final temperature distribution
+    plt.plot(x, core_state.temperature, label="Core")
+    plt.xlabel("Position [m]")
+    plt.ylabel("Temperature [K]")
+    plt.show()
+    plt.close()
+
+    plt.plot(x_secondary, secondary_state.temperature, label="Secondary")
+    plt.xlabel("Position [m]")
+    plt.ylabel("Temperature [K]")
+    plt.show()
+    plt.close()
+
+    plt.plot(x, final_state.phi)
+    plt.xlabel("Position [m]")
+    plt.ylabel("Neutron Flux [n/m^2-s]")
+    plt.title("Neutron Flux Distribution")
+    plt.show()
+    plt.close()
 
 if __name__ == "__main__":
     main()
