@@ -37,6 +37,7 @@ class NuclearDataModel(BaseModel):
     decay_constant: float
     kappa: float
     power: float
+    neutron_velocity: float
 
 class GeometryModel(BaseModel):
     core_length: float
