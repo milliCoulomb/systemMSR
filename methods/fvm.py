@@ -16,7 +16,7 @@ class FVM(Method):
     def __init__(self, dxs):
         self.dx = dxs
 
-    def build_stif(self, k):
+    def build_stif(self, k, periodic=True):
         """
         Build the $-\div{D\grad\phi}$ operator:
         2 * D_i * [
@@ -32,9 +32,14 @@ class FVM(Method):
         diag = 2 * k * (k_p / (k * dxs_p + k_p * dxs) + k_m / (k_m * dxs + k * dxs_m)) / dxs
         diag_p = -2 * k * k_p / (k * dxs_p + k_p * dxs) / dxs
         diag_m = -2 * k * k_m / (k_m * dxs + k * dxs_m) / dxs
-        diagonals = [diag, diag_p[1:], diag_m[:-1], diag_p[0], diag_m[-1]]
-        offsets = [0, 1, -1, 1 - len(dxs), len(dxs) - 1]
-        return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
+        if periodic:
+            diagonals = [diag, diag_p[1:], diag_m[:-1], diag_p[0], diag_m[-1]]
+            offsets = [0, 1, -1, 1 - len(dxs), len(dxs) - 1]
+            return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
+        else:
+            diagonals = [diag, diag_p[1:], diag_m[:-1]]
+            offsets = [0, 1, -1]
+            return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
 
     def build_mass(self, m):
         """
@@ -44,7 +49,7 @@ class FVM(Method):
         dxs = self.dx
         return diags(m * np.ones_like(dxs), 0, shape=(len(dxs), len(dxs)))
 
-    def build_grad(self, u):
+    def build_grad(self, u, periodic=True):
         """
         Build the $v(x)\cdot\grad c(x)$ operator:
         v_i * (c_{i+1} - c_i) / \Delta x_i
@@ -54,6 +59,11 @@ class FVM(Method):
         diag = u / dxs
         diag_p = np.zeros_like(dxs)
         diag_m = -u_m / dxs
-        diagonals = [diag, diag_p[1:], diag_m[:-1], diag_p[0], diag_m[-1]]
-        offsets = [0, 1, -1, 1 - len(dxs), len(dxs) - 1]
-        return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
+        if periodic:
+            diagonals = [diag, diag_p[1:], diag_m[:-1], diag_p[0], diag_m[-1]]
+            offsets = [0, 1, -1, 1 - len(dxs), len(dxs) - 1]
+            return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
+        else:
+            diagonals = [diag, diag_p[1:], diag_m[:-1]]
+            offsets = [0, 1, -1]
+            return diags(diagonals, offsets, shape=(len(dxs), len(dxs)))
