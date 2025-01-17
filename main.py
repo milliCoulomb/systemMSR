@@ -18,29 +18,6 @@ def main():
     # Parse the input deck
     input_deck = InputDeck.from_yaml(input_deck_path)
 
-    # Accessing some parameters as examples
-    print(f"Total Simulation Time: {input_deck.simulation.total_time} s")
-    print(f"Time Step: {input_deck.simulation.time_step} s")
-
-    print(f"Core Length: {input_deck.geometry.core_length} m")
-    print(
-        f"Heat Exchanger Coefficient: {input_deck.geometry.heat_exchanger_coefficient} W/m^3-K"
-    )
-
-    print(
-        f"Primary Salt Density: {input_deck.materials.primary_salt['density']} kg/m^3"
-    )
-    print(f"Secondary Salt CP: {input_deck.materials.secondary_salt['cp']} J/kg-K")
-
-    print(
-        f"Nuclear Diffusion Coefficient: {input_deck.nuclear_data.diffusion_coefficient} m"
-    )
-
-    # Example: Access pump primary schedule
-    print("Primary Pump Schedule:")
-    for point in input_deck.operational_parameters.pump_primary.schedule:
-        print(f"  Time: {point.time} s, Flow Rate: {point.flow_rate} kg/s")
-
     core_geom = CoreGeometry(
         core_length=input_deck.geometry.core_length,
         exchanger_length=input_deck.geometry.exchanger_length,
@@ -67,6 +44,7 @@ def main():
         Lambda=nuc.decay_constant,
         kappa=nuc.kappa,
         power=nuc.power,
+        neutron_velocity=nuc.neutron_velocity,
     )
     fvm = FVM(core_geom.dx)
     fvm_secondary = FVM(secondary_geom.dx)
@@ -107,19 +85,6 @@ def main():
     x = np.linspace(
         0, core_geom.core_length + core_geom.exchanger_length, len(final_state.phi)
     )
-    plt.plot(x, final_state.phi)
-    plt.xlabel("Position [m]")
-    plt.ylabel("Neutron Flux [n/m^2-s]")
-    plt.title("Neutron Flux Distribution")
-    plt.show()
-    plt.close()
-    # plot precursor concentration
-    plt.plot(x, final_state.C)
-    plt.xlabel("Position [m]")
-    plt.ylabel("Precursor Concentration [n/m^3]")
-    plt.title("Precursor Concentration Distribution")
-    plt.show()
-    plt.close()
     print(f"keff: {final_state.keff}")
 
     # solve the thermo-hydraulics problem
@@ -134,12 +99,6 @@ def main():
     core_state, secondary_state = th_solver.solve_static(
         core_state, secondary_state, final_state
     )
-    # plot the final temperature distribution
-    plt.plot(x, core_state.temperature, label="Core")
-    plt.xlabel("Position [m]")
-    plt.ylabel("Temperature [K]")
-    plt.show()
-    plt.close()
 
     x_secondary = np.linspace(
         0,
@@ -148,12 +107,6 @@ def main():
         + secondary_geom.second_loop_length,
         len(secondary_state.temperature),
     )
-
-    plt.plot(x_secondary, secondary_state.temperature, label="Secondary")
-    plt.xlabel("Position [m]")
-    plt.ylabel("Temperature [K]")
-    plt.show()
-    plt.close()
 
     # solve the coupled problem
     coupler = SteadyStateCoupler(th_solver, neut_solver)
