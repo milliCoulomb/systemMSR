@@ -324,6 +324,3 @@ class NeutronicsSolver:
         )
         logger.debug("Neutronic time step made.")
         return new_neut_state
-
-
-        
