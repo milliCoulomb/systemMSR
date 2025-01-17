@@ -40,6 +40,7 @@ nuclear_data:
   decay_constant: 0.1           # [1/s] decay constant of precursor
   power: 8.0e8            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
+  neutron_velocity: 2.2e3        # [m/s] average neutron velocity
 
 operational_parameters:
   pump_primary:
