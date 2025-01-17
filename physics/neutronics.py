@@ -53,7 +53,6 @@ class NeutronicsSolver:
         Update temperature-dependent cross sections and returns arrays of Sigma_a, Sigma_f, and D.
         """
         # load density and expansion coefficients from input deck
-        rho = th_params.rho
         alpha = th_params.expansion_coefficient
         T_ref = 922.0 * np.ones_like(self.dx)
         if len(th_state.temperature) != len(self.dx):
@@ -64,52 +63,100 @@ class NeutronicsSolver:
         D = self.params.D * (1 + alpha * (th_state.temperature - T_ref))
         logger.debug("Nuclear parameters updated based on temperature.")
         return Sigma_a, Sigma_f, D
-
-    # define a method to assemble the eigenproblem matrices for the vector (phi, C) at a given time step and temperature profile
-    def assemble_matrix_static(
-        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
-    ) -> np.ndarray:
+    
+    def build_removal_op_flux(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> np.ndarray:
         """
-        Assemble the matrix for the neutron flux and precursor concentration eigenvalue problem at a given time step and temperature profile.
+        Build the removal operator for the neutron flux. (diffusion + absorption)
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
-        Sigma_a, Sigma_f, D = self.update_nuclear_parameters(th_state=th_state, th_params=th_params)
-        # make a mask so that Sigma_f = 0 in the exchanger region
-        Sigma_f = np.concatenate([Sigma_f[: self.geom.n_cells_core], np.zeros(self.geom.n_cells_exchanger)])
-        # build the FVM matrices
-        # diffusion matrix for the neutron flux
+        Sigma_a, _, D = self.update_nuclear_parameters(th_state=th_state, th_params=th_params)
         diffusion_flux = self.method.build_stif(D)
-        # absorption matrix for the neutron flux
         absorption_flux = self.method.build_mass(Sigma_a)
-        # fission matrix for the neutron flux
-        fission_flux = (
-            self.method.build_mass(Sigma_f)
-            * self.params.nu_fission
-            * (1 - self.params.beta)
-        )
-        # delayed neutron precursor matrix (advection term)
+        logger.debug("Removal operator built for the neutron flux.")
+        return diffusion_flux + absorption_flux
+    
+    def build_removal_op_precursor(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> np.ndarray:
+        """
+        Build the removal operator for the delayed neutron precursors. (advection + decay)
+        """
+        # evaluate the cross sections and diffusion coefficient at the given temperature
+        decay_precursor = self.method.build_mass(self.params.Lambda)
         velocity = (
             th_state.flow_rate
             / (th_params.rho * np.pi * self.geom.core_radius**2)
             * np.ones_like(self.dx)
         )
         precursor_advection = self.method.build_grad(velocity)
-        # decay matrix for the delayed neutron precursors
-        decay_precursor = self.method.build_mass(self.params.Lambda)
-        # precursor production matrix
+        logger.debug("Removal operator built for the delayed neutron precursors.")
+        return precursor_advection + decay_precursor
+    
+    def build_precursor_production_op(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> np.ndarray:
+        """
+        Build the operator for the production of delayed neutron precursors.
+        """
+        # evaluate the cross sections and diffusion coefficient at the given temperature
+        _, Sigma_f, _ = self.update_nuclear_parameters(th_state=th_state, th_params=th_params)
+        Sigma_f = np.concatenate([Sigma_f[: self.geom.n_cells_core], np.zeros(self.geom.n_cells_exchanger)])
         precursor_production = (
             self.method.build_mass(Sigma_f) * self.params.nu_fission * self.params.beta
         )
+        logger.debug("Operator built for the production of delayed neutron precursors.")
+        return precursor_production
+    
+    def build_precursor_decay_op(self) -> np.ndarray:
+        """
+        Build the operator for the decay of delayed neutron precursors.
+        """
+        decay_precursor = self.method.build_mass(self.params.Lambda)
+        logger.debug("Operator built for the decay of delayed neutron precursors.")
+        return decay_precursor
+    
+    def build_prompt_fission_op(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> np.ndarray:
+        """
+        Build the operator for the prompt fission neutrons.
+        """
+        # evaluate the cross sections and diffusion coefficient at the given temperature
+        _, Sigma_f, _ = self.update_nuclear_parameters(th_state=th_state, th_params=th_params)
+        Sigma_f = np.concatenate([Sigma_f[: self.geom.n_cells_core], np.zeros(self.geom.n_cells_exchanger)])
+        fission_flux = (
+            self.method.build_mass(Sigma_f)
+            * self.params.nu_fission
+            * (1 - self.params.beta)
+        )
+        logger.debug("Operator built for the prompt fission neutrons.")
+        return fission_flux
+    
+    def build_empty_op(self) -> np.ndarray:
+        """
+        Build an empty operator.
+        """
         empty = diags(np.zeros_like(self.dx), 0, shape=(len(self.dx), len(self.dx)))
+        logger.debug("Empty operator built.")
+        return empty
+
+    def assemble_matrix_static(
+        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
+    ) -> np.ndarray:
+        """
+        Assemble the matrix for the neutron flux and precursor concentration eigenvalue problem at a given time step and temperature profile.
+        """
+        # build the operators
+        removal_flux = self.build_removal_op_flux(th_state, th_params)
+        removal_precs = self.build_removal_op_precursor(th_state, th_params)
+        decay_precursor = self.build_precursor_decay_op()
+        precursor_production = self.build_precursor_production_op(th_state, th_params)
+        fission_flux = self.build_prompt_fission_op(th_state, th_params)
+        empty = self.build_empty_op()
         # assemble the matrices
         LHS_blocks = [
-            [diffusion_flux + absorption_flux, - decay_precursor],
-            [empty, precursor_advection + decay_precursor],
+            [removal_flux, - decay_precursor],
+            [empty, removal_precs],
         ]
         RHS_blocks = [
             [fission_flux, empty],
             [precursor_production, empty],
         ]
+        print(f"Shape of empty: {empty.shape}")
         LHS_mat = bmat(LHS_blocks)
         RHS_mat = bmat(RHS_blocks)
         logger.debug("Matrix assembled for the eigenvalue problem.")
@@ -142,7 +189,7 @@ class NeutronicsSolver:
         # solve the eigenvalue problem
         eigvals, eigvecs = spla.eigs(
             RHS_mat,
-            k=3,
+            k=1,
             M=LHS_mat,
         )
         # extract the solution
