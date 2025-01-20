@@ -33,7 +33,6 @@ def main():
     neut_solver = simulation_objects["neut_solver"]
     core_state = simulation_objects["core_state"]
     secondary_state = simulation_objects["secondary_state"]
-    velocity = simulation_objects["velocity"]
     time_params = simulation_objects["time_params"]
     th_params_primary = simulation_objects["th_params_primary"]
     th_params_secondary = simulation_objects["th_params_secondary"]
