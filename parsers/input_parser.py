@@ -11,6 +11,7 @@ class SchedulePointModel(BaseModel):
     time: float
     flow_rate: Optional[float] = None
     temperature: Optional[float] = None
+    intensity: Optional[float] = None
 
 class PumpModel(BaseModel):
     mode: str
@@ -19,10 +20,16 @@ class PumpModel(BaseModel):
 class SecondaryInletTempModel(BaseModel):
     schedule: List[SchedulePointModel]
 
+class AcceleratorModel(BaseModel):
+    mode: str
+    schedule: List[SchedulePointModel]
+    electron_to_gamma: float
+
 class OperationalParametersModel(BaseModel):
     pump_primary: PumpModel
     pump_secondary: PumpModel
     secondary_inlet_temp: SecondaryInletTempModel
+    accelerator: AcceleratorModel
 
 class MaterialsModel(BaseModel):
     primary_salt: dict
