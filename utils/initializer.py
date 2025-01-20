@@ -31,6 +31,12 @@ def initialize_simulation(input_deck):
     print("Secondary Inlet Temperature Schedule:")
     print(f"Times: {times_sec_in_temp}")
     print(f"Temperatures: {temps_sec_in_temp}")
+
+    # Initialize accelerator schedule
+    times_acc, intensity = initialize_accelerator_schedule(input_deck)
+    print("Accelerator Schedule:")
+    print(f"Times: {times_acc}")
+    print(f"Intensity: {intensity}")
     
     # Initialize geometries
     core_geom = CoreGeometry(
@@ -152,5 +158,10 @@ def initialize_secondary_inlet_temperature(input_deck):
     schedule = input_deck.operational_parameters.secondary_inlet_temp.schedule
     times = np.array([point.time for point in schedule])
     temperatures = np.array([point.temperature for point in schedule])
-    
     return times, temperatures
+
+def initialize_accelerator_schedule(input_deck):
+    schedule = input_deck.operational_parameters.accelerator.schedule
+    times = np.array([point.time for point in schedule])
+    intensity = np.array([point.intensity for point in schedule])
+    return times, intensity
