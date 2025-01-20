@@ -101,7 +101,6 @@ def main():
         power=nuc.power,
         neutron_velocity=nuc.neutron_velocity,
     )
-    neut_params.Sigma_f = neut_params.Sigma_f / 1.143305412728669
     fvm = FVM(core_geom.dx)
     fvm_secondary = FVM(secondary_geom.dx)
     neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
@@ -165,7 +164,8 @@ def main():
         0, core_geom.core_length + core_geom.exchanger_length, len(final_state.phi)
     )
     print(f"keff: {final_state.keff}")
-
+    # renormalize the fission cross section by the keff
+    neut_params.Sigma_f = neut_params.Sigma_f / final_state.keff
     # solve the thermo-hydraulics problem
     th_solver = ThermoHydraulicsSolver(
         th_params_primary,
@@ -194,6 +194,10 @@ def main():
     )
     # print the coupled keff
     print(f"Final keff: {neutronic_state.keff}")
+    # renormalize the fission cross section by the keff
+    neut_params.Sigma_f = neut_params.Sigma_f / neutronic_state.keff
+    # rebuild the neutronics solver
+    neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
     # plot the final temperature distribution
     plt.plot(x, core_state.temperature, label="Core")
     plt.xlabel("Position [m]")
@@ -225,11 +229,13 @@ def main():
     )
 
     core_states, secondary_states, neutronic_states = unsteady_coupler.solve()
-    # plot the power as a function of time, do not plot the stabilisation phase that is the first 1500 time steps
-    time = time_params.time_values[1500:]
-    power = np.array([state.power for state in neutronic_states])[1500:]
+    # start the plot at the time value closest to 200s
+    index_to_start = (np.abs(time_params.time_values - 200)).argmin()
+    time = time_params.time_values[index_to_start:]
+    power = np.array([state.power for state in neutronic_states])[index_to_start:]
     # also duplicate the axis to show the mass flow rate of the secondary loop
-    flow_rate_secondary = np.array([state.flow_rate for state in secondary_states])[1500:]
+    flow_rate_secondary = np.array([state.flow_rate for state in secondary_states])[index_to_start:]
+    flow_rate_primary = np.array([state.flow_rate for state in core_states])[index_to_start:]
     fig, ax1 = plt.subplots()
     color = "tab:red"
     ax1.set_xlabel("Time [s]")
@@ -240,10 +246,40 @@ def main():
     color = "tab:blue"
     ax2.set_ylabel("Flow Rate [kg/s]", color=color)
     ax2.plot(time, flow_rate_secondary, color=color)
+    # also plot the primary flow rate
+    ax2.plot(time, flow_rate_primary, color="tab:green")
     ax2.tick_params(axis="y", labelcolor=color)
     fig.tight_layout()
     plt.show()
     plt.close()
+
+    # okay, now I need to do an animation as a function of time
+    # I will animate the temperature distribution in the core
+    import matplotlib.animation as animation
+    fig, ax = plt.subplots()
+    line, = ax.plot([], [], lw=2)
+    ax.set_ylim(800, 1200)
+    ax.set_xlim(0, core_geom.core_length)
+    ax.set_xlabel("Position [m]")
+    ax.set_ylabel("Temperature [K]")
+    ax.set_title("Temperature Distribution in the Core")
+    # initialization function: plot the background of each frame
+    def init():
+        line.set_data([], [])
+        return (line,)
+    # animation function. This is called sequentially
+    def animate(i):
+        x = np.linspace(0, core_geom.core_length, len(core_states[i + index_to_start].temperature))
+        y = core_states[i + index_to_start].temperature
+        line.set_data(x, y)
+        return (line,)
+    # call the animator
+    anim = animation.FuncAnimation(
+        fig, animate, init_func=init, frames=len(core_states) - index_to_start, interval=200, blit=True
+    )
+    plt.show()
+    plt.close()
+
 
 
 
