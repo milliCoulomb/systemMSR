@@ -1,8 +1,8 @@
 # input_deck.yaml
 
 simulation:
-  total_time: 100.0          # [s] total simulation time
-  time_step: 0.01            # [s] base time-step
+  total_time: 500.0          # [s] total simulation time
+  time_step: 1e-1            # [s] base time-step
 
 geometry:
   core_length: 3.0           # [m] length of the core region
@@ -48,23 +48,45 @@ operational_parameters:
     # flow rate should be linearly interpolated between the given points
     schedule:
       - time: 0.0
-        flow_rate: 10.0           # kg/s
-      - time: 50.0
-        flow_rate: 20.0           # kg/s
-      - time: 80.0
-        flow_rate: 5.0            # kg/s
+        flow_rate: 100.0           # kg/s
+      - time: 200.0
+        flow_rate: 100.0           # kg/s
+      - time: 250.0
+        flow_rate: 100.0           # kg/s
+      - time: 300.0
+        flow_rate: 100.0           # kg/s
+      - time: 350.0
+        flow_rate: 100.0           # kg/s
+      - time: 500.0
+        flow_rate: 100.0             # kg/s
   
   pump_secondary:
     mode: "flow_rate_control"
     schedule:
       - time: 0.0
-        flow_rate: 5.0            # kg/s
-      - time: 70.0
-        flow_rate: 10.0           # kg/s
+        flow_rate: 100.0            # kg/s
+      - time: 200.0
+        flow_rate: 100.0            # kg/s
+      - time: 250.0
+        flow_rate: 100.0            # kg/s
+      - time: 300.0
+        flow_rate: 100.0            # kg/s
+      - time: 350.0
+        flow_rate: 100.0            # kg/s
+      - time: 500.0
+        flow_rate: 100.0            # kg/s
 
   secondary_inlet_temp:
     schedule:
       - time: 0.0
-        temperature: 400.0        # [K]
-      - time: 60.0
-        temperature: 450.0        # [K]
+        temperature: 800.0        # [K]
+      - time: 200.0
+        temperature: 800.0        # [K]
+      - time: 250.0
+        temperature: 700.0        # [K]
+      - time: 300.0
+        temperature: 700.0        # [K]
+      - time: 350.0
+        temperature: 700.0        # [K]
+      - time: 500.0
+        temperature: 700.0        # [K]
