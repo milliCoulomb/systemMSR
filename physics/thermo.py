@@ -16,6 +16,9 @@ from utils.states import ThermoHydraulicsState, NeutronicsState
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# MAGIC NUMBERS
+THETA = 1.0
+
 
 @dataclass
 class ThermoHydraulicsParameters:
@@ -177,6 +180,74 @@ class ThermoHydraulicsSolver:
         logger.debug("Matrix assembled for the static case.")
         return LHS_mat
 
+    def assemble_matrix_time_dependent(
+        self,
+        th_state_primary: ThermoHydraulicsState,
+        th_state_secondary: ThermoHydraulicsState,
+    ):
+        """
+        Assemble the matrix for the time-dependent case.
+        """
+        # build the operators
+        diff_primary = self.build_temperature_diffusion_operator(
+            th_state_primary, primary=True, periodic=True
+        ) / (
+            self.params_primary.rho
+            * self.params_primary.cp
+            * self.core_geom.core_radius**2
+            * np.pi
+        )
+        adv_primary = self.build_temperature_advection_operator(
+            th_state_primary, primary=True, periodic=True
+        ) / (
+            self.params_primary.rho
+            * self.params_primary.cp
+            * self.core_geom.core_radius**2
+            * np.pi
+        )
+        heat_exchange_primary = self.build_heat_exchanger_operator(primary=True) / (
+            self.params_primary.rho
+            * self.params_primary.cp
+            * self.core_geom.core_radius**2
+            * np.pi
+        )
+        diff_secondary = self.build_temperature_diffusion_operator(
+            th_state_secondary, primary=False, periodic=False
+        ) / (
+            self.params_secondary.rho
+            * self.params_secondary.cp
+            * self.secondary_geom.loop_radius**2
+            * np.pi
+        )
+        adv_secondary = self.build_temperature_advection_operator(
+            th_state_secondary, primary=False, periodic=False
+        ) / (
+            self.params_secondary.rho
+            * self.params_secondary.cp
+            * self.secondary_geom.loop_radius**2
+            * np.pi
+        )
+        heat_exchange_secondary = self.build_heat_exchanger_operator(primary=False) / (
+            self.params_secondary.rho
+            * self.params_secondary.cp
+            * self.secondary_geom.loop_radius**2
+            * np.pi
+        )
+
+        LHS_blocks = [
+            [
+                -diff_primary - adv_primary - heat_exchange_primary,
+                heat_exchange_primary,
+            ],
+            [
+                heat_exchange_secondary,
+                -diff_secondary - adv_secondary - heat_exchange_secondary,
+            ],
+        ]
+        LHS_mat = bmat(LHS_blocks)
+        logger.debug("Matrix assembled for the time-dependent case.")
+        return LHS_mat
+
     def build_steady_state_rhs_vector(
         self,
         th_state_primary: ThermoHydraulicsState,
@@ -207,8 +278,47 @@ class ThermoHydraulicsSolver:
             ]
         )
         # CAREFUL POWER DENSITY IS ALREADY MULTIPLIED BY THE AREA
-        power_source = (
-            neutronic_state.power_density
+        power_source = neutronic_state.power_density
+        RHS_vector = np.concatenate([power_source, source_term_secondary])
+        return RHS_vector
+
+    def build_time_dependent_rhs_vector(
+        self,
+        th_state_primary: ThermoHydraulicsState,
+        th_state_secondary: ThermoHydraulicsState,
+        neutronic_state: NeutronicsState,
+    ):
+        """
+        Build the right-hand side vector for the time-dependent problem
+        """
+        boundary_condition = th_state_secondary.T_in * (
+            th_state_secondary.flow_rate
+            * self.params_secondary.cp
+            / self.secondary_geom.dx[0]
+            + self.params_secondary.k
+            / self.secondary_geom.dx[0] ** 2
+            * np.pi
+            * self.secondary_geom.loop_radius**2
+        )
+        source_term_secondary = np.concatenate(
+            [
+                np.array([boundary_condition]),
+                np.zeros(self.secondary_geom.n_cells_first_loop - 1),
+                np.zeros(self.secondary_geom.n_cells_exchanger),
+                np.zeros(self.secondary_geom.n_cells_second_loop),
+            ]
+        ) / (
+            self.params_secondary.rho
+            * self.params_secondary.cp
+            * self.secondary_geom.loop_radius**2
+            * np.pi
+        )
+        # CAREFUL POWER DENSITY IS ALREADY MULTIPLIED BY THE AREA
+        power_source = neutronic_state.power_density / (
+            self.params_primary.rho
+            * self.params_primary.cp
+            * self.core_geom.core_radius**2
+            * np.pi
         )
         RHS_vector = np.concatenate([power_source, source_term_secondary])
         return RHS_vector
@@ -231,3 +341,53 @@ class ThermoHydraulicsSolver:
         th_state_primary.temperature = T[: self.n_cells_primary]
         th_state_secondary.temperature = T[self.n_cells_primary :]
         return th_state_primary, th_state_secondary
+
+    def make_time_step(
+        self,
+        th_state_primary: ThermoHydraulicsState,
+        th_state_secondary: ThermoHydraulicsState,
+        neutronic_state: NeutronicsState,
+        dt: float,
+    ):
+        """
+        Make a time step for the transient problem
+        """
+        operator = self.assemble_matrix_time_dependent(
+            th_state_primary, th_state_secondary
+        )
+        rhs_vector = self.build_time_dependent_rhs_vector(
+            th_state_primary, th_state_secondary, neutronic_state
+        )
+        identity = diags(
+            [np.ones(self.n_cells_primary + self.n_cells_secondary)],
+            [0],
+            shape=(
+                self.n_cells_primary + self.n_cells_secondary,
+                self.n_cells_primary + self.n_cells_secondary,
+            ),
+        )
+        LHS = identity - THETA * dt * operator
+        RHS = identity + (1 - THETA) * dt * operator
+        T = spla.spsolve(
+            LHS,
+            RHS
+            @ np.concatenate(
+                [th_state_primary.temperature, th_state_secondary.temperature]
+            )
+            + dt * rhs_vector,
+        )
+        T_primary = T[: self.n_cells_primary]
+        T_secondary = T[self.n_cells_primary :]
+        # iniatiate new state
+        th_state_primary_new = ThermoHydraulicsState(
+            flow_rate=th_state_primary.flow_rate,
+            temperature=T_primary,
+            T_in=th_state_primary.T_in,
+        )
+        th_state_secondary_new = ThermoHydraulicsState(
+            flow_rate=th_state_secondary.flow_rate,
+            temperature=T_secondary,
+            T_in=th_state_secondary.T_in,
+        )
+        logger.debug("Transient thermo-hydraulic problem solved.")
+        return th_state_primary_new, th_state_secondary_new
