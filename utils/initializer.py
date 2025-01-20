@@ -28,16 +28,10 @@ def initialize_simulation(input_deck):
     
     # Initialize secondary inlet temperature schedule
     times_sec_in_temp, temps_sec_in_temp = initialize_secondary_inlet_temperature(input_deck)
-    print("Secondary Inlet Temperature Schedule:")
-    print(f"Times: {times_sec_in_temp}")
-    print(f"Temperatures: {temps_sec_in_temp}")
 
     # Initialize accelerator schedule
     times_acc, intensity = initialize_accelerator_schedule(input_deck)
-    print("Accelerator Schedule:")
-    print(f"Times: {times_acc}")
-    print(f"Intensity: {intensity}")
-    
+
     # Initialize geometries
     core_geom = CoreGeometry(
         core_length=input_deck.geometry.core_length,
@@ -106,7 +100,6 @@ def initialize_simulation(input_deck):
     velocity = core_state.flow_rate / (
         input_deck.materials.primary_salt["density"] * np.pi * core_geom.core_radius**2
     )
-    print(f"Velocity: {velocity}")
     
     # Initialize time parameters
     NUMBER_TIME_STEPS = int(input_deck.simulation.total_time / input_deck.simulation.time_step)
@@ -120,6 +113,8 @@ def initialize_simulation(input_deck):
         time_values_secondary_pump=pump_secondary['times'],
         secondary_inlet_temperature_values=temps_sec_in_temp,
         time_values_secondary_inlet_temperature=times_sec_in_temp,
+        accelerator_intensity_values=intensity,
+        time_values_accelerator_intensity=times_acc,
     )
     
     return {
@@ -133,7 +128,6 @@ def initialize_simulation(input_deck):
         "secondary_state": secondary_state,
         "th_params_primary": th_params_primary,
         "th_params_secondary": th_params_secondary,
-        "velocity": velocity,
         "time_params": time_params,
     }
 
