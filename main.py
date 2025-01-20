@@ -8,7 +8,9 @@ from utils.geometry import CoreGeometry, SecondaryLoopGeometry
 from physics.thermo import ThermoHydraulicsParameters
 import matplotlib.pyplot as plt
 from utils.states import ThermoHydraulicsState, NeutronicsState
+from utils.time_parameters import TimeParameters
 from couplers.SteadyStateCoupler import SteadyStateCoupler
+from couplers.UnsteadyCoupler import UnsteadyCoupler
 
 
 def main():
@@ -17,6 +19,59 @@ def main():
 
     # Parse the input deck
     input_deck = InputDeck.from_yaml(input_deck_path)
+
+    # Accessing some parameters as examples
+    print(f"Total Simulation Time: {input_deck.simulation.total_time} s")
+    print(f"Time Step: {input_deck.simulation.time_step} s")
+
+    print(f"Core Length: {input_deck.geometry.core_length} m")
+    print(
+        f"Heat Exchanger Coefficient: {input_deck.geometry.heat_exchanger_coefficient} W/m^3-K"
+    )
+
+    print(
+        f"Primary Salt Density: {input_deck.materials.primary_salt['density']} kg/m^3"
+    )
+    print(f"Secondary Salt CP: {input_deck.materials.secondary_salt['cp']} J/kg-K")
+
+    print(
+        f"Nuclear Diffusion Coefficient: {input_deck.nuclear_data.diffusion_coefficient} m"
+    )
+
+    # Example: Access pump primary schedule
+    print("Primary Pump Schedule:")
+    times_primary = np.array(
+        [point.time for point in input_deck.operational_parameters.pump_primary.schedule]
+    )
+    rates_primary = np.array(
+        [point.flow_rate for point in input_deck.operational_parameters.pump_primary.schedule]
+    )
+    print(f"Times: {times_primary}")
+    print(f"Flow Rates: {rates_primary}")
+    times_secondary = np.array(
+        [point.time for point in input_deck.operational_parameters.pump_secondary.schedule]
+    )
+    rates_secondary = np.array(
+        [point.flow_rate for point in input_deck.operational_parameters.pump_secondary.schedule]
+    )
+    print(f"Times: {times_secondary}")
+    print(f"Flow Rates: {rates_secondary}")
+
+    print("Secondary Inlet Temperature Schedule:")
+    times_secondary_inlet_temperature = np.array(
+        [
+            point.time
+            for point in input_deck.operational_parameters.secondary_inlet_temp.schedule
+        ]
+    )
+    temperatures_secondary_inlet = np.array(
+        [
+            point.temperature
+            for point in input_deck.operational_parameters.secondary_inlet_temp.schedule
+        ]
+    )
+    print(f"Times: {times_secondary_inlet_temperature}")
+    print(f"Temperatures: {temperatures_secondary_inlet}")
 
     core_geom = CoreGeometry(
         core_length=input_deck.geometry.core_length,
@@ -46,6 +101,7 @@ def main():
         power=nuc.power,
         neutron_velocity=nuc.neutron_velocity,
     )
+    neut_params.Sigma_f = neut_params.Sigma_f / 1.143305412728669
     fvm = FVM(core_geom.dx)
     fvm_secondary = FVM(secondary_geom.dx)
     neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
@@ -64,6 +120,29 @@ def main():
         input_deck.materials.primary_salt["density"] * np.pi * core_geom.core_radius**2
     )
     print(f"Velocity: {velocity}")
+
+    NUMBER_TIME_STEPS = int(input_deck.simulation.total_time / input_deck.simulation.time_step)
+    # initiate the time parameters
+    time_params = TimeParameters(
+        time_step=input_deck.simulation.time_step,
+        total_time=input_deck.simulation.total_time,
+        num_time_steps=NUMBER_TIME_STEPS,
+        pump_values_primary=rates_primary,
+        time_values_primary_pump=times_primary,
+        pump_values_secondary=rates_secondary,
+        time_values_secondary_pump=times_secondary,
+        secondary_inlet_temperature_values=temperatures_secondary_inlet,
+        time_values_secondary_inlet_temperature=times_secondary_inlet_temperature,
+    )
+    time = time_params.time_values
+    # plot the pump schedule
+    plt.plot(time, time_params.pump_values_primary, label="Primary Pump")
+    plt.plot(time, time_params.pump_values_secondary, label="Secondary Pump")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Flow Rate [kg/s]")
+    plt.legend()
+    plt.show()
+
     # initiate the thermo-hydraulics parameters
     th_params_primary = ThermoHydraulicsParameters(
         rho=input_deck.materials.primary_salt["density"],
@@ -134,6 +213,39 @@ def main():
     plt.title("Neutron Flux Distribution")
     plt.show()
     plt.close()
+
+    # solve the unsteady coupled problem
+    unsteady_coupler = UnsteadyCoupler(
+        th_solver,
+        neut_solver,
+        neutronic_state,
+        core_state,
+        secondary_state,
+        time_params,
+    )
+
+    core_states, secondary_states, neutronic_states = unsteady_coupler.solve()
+    # plot the power as a function of time, do not plot the stabilisation phase that is the first 1500 time steps
+    time = time_params.time_values[1500:]
+    power = np.array([state.power for state in neutronic_states])[1500:]
+    # also duplicate the axis to show the mass flow rate of the secondary loop
+    flow_rate_secondary = np.array([state.flow_rate for state in secondary_states])[1500:]
+    fig, ax1 = plt.subplots()
+    color = "tab:red"
+    ax1.set_xlabel("Time [s]")
+    ax1.set_ylabel("Power [MW]", color=color)
+    ax1.plot(time, power / 1e6, color=color)
+    ax1.tick_params(axis="y", labelcolor=color)
+    ax2 = ax1.twinx()
+    color = "tab:blue"
+    ax2.set_ylabel("Flow Rate [kg/s]", color=color)
+    ax2.plot(time, flow_rate_secondary, color=color)
+    ax2.tick_params(axis="y", labelcolor=color)
+    fig.tight_layout()
+    plt.show()
+    plt.close()
+
+
 
 if __name__ == "__main__":
     main()
