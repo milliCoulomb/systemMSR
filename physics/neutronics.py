@@ -302,7 +302,7 @@ class NeutronicsSolver:
         Make a time step for the neutron flux and precursor concentration.
         """
         operator = self.assemble_matrix_time_dependent(th_state, th_params)
-        identity = diags(np.ones_like(self.dx), 0, shape=(len(self.dx), len(self.dx)))
+        identity = diags(np.ones(2 * self.n_cells), 0, shape=(2 * self.n_cells, 2 * self.n_cells))
         LHS = identity - THETA * dt * operator
         RHS = identity + (1 - THETA) * dt * operator
         # solve the system
