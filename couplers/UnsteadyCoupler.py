@@ -78,6 +78,7 @@ class UnsteadyCoupler:
                     th_state_primary=current_th_state_primary,
                     th_state_secondary=current_th_state_secondary,
                     neutronic_state=neutronic_step,
+                    old_neutronic_state=current_neutronics_state,
                     dt=time_parameters.time_step,
                 )
                 # calculate residuals
