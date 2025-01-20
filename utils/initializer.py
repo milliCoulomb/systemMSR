@@ -7,6 +7,7 @@ from methods.fvm import FVM
 from physics.neutronics import NeutronicsSolver
 from utils.states import ThermoHydraulicsState
 from utils.time_parameters import TimeParameters
+from physics.thermo import ThermoHydraulicsParameters
 
 def initialize_simulation(input_deck):
     # Print simulation parameters
@@ -67,6 +68,22 @@ def initialize_simulation(input_deck):
     fvm = FVM(core_geom.dx)
     fvm_secondary = FVM(secondary_geom.dx)
     neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
+
+    # initialize the thermo-hydraulics parameters
+    th_params_primary = ThermoHydraulicsParameters(
+        rho=input_deck.materials.primary_salt["density"],
+        cp=input_deck.materials.primary_salt["cp"],
+        k=input_deck.materials.primary_salt["k"],
+        heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
+        expansion_coefficient=input_deck.materials.primary_salt["expansion"],
+    )
+    th_params_secondary = ThermoHydraulicsParameters(
+        rho=input_deck.materials.secondary_salt["density"],
+        cp=input_deck.materials.secondary_salt["cp"],
+        k=input_deck.materials.secondary_salt["k"],
+        heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
+        expansion_coefficient=input_deck.materials.secondary_salt["expansion"],
+    )
     
     # Initialize thermohydraulics states
     core_state = ThermoHydraulicsState(
@@ -108,6 +125,8 @@ def initialize_simulation(input_deck):
         "neut_solver": neut_solver,
         "core_state": core_state,
         "secondary_state": secondary_state,
+        "th_params_primary": th_params_primary,
+        "th_params_secondary": th_params_secondary,
         "velocity": velocity,
         "time_params": time_params,
     }
