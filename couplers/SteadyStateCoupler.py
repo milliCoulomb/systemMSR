@@ -1,4 +1,4 @@
-# physics/neutronics.py
+# physics/SteadyStateCoupler.py
 
 from dataclasses import dataclass
 from typing import List
