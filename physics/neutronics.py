@@ -69,9 +69,9 @@ class NeutronicsSolver:
         if len(th_state.temperature) != len(self.dx):
             raise ValueError("Temperature profile and geometry mismatch.")
         # calculate the temperature-dependent cross sections
-        Sigma_a = self.params.Sigma_a * (1 - alpha * (th_state.temperature - T_ref))
-        Sigma_f = self.params.Sigma_f * (1 - alpha * (th_state.temperature - T_ref))
-        D = self.params.D * (1 + alpha * (th_state.temperature - T_ref))
+        Sigma_a = self.params.Sigma_a * np.exp(- alpha * (th_state.temperature - T_ref))
+        Sigma_f = self.params.Sigma_f * np.exp(- alpha * (th_state.temperature - T_ref))
+        D = self.params.D * np.exp(alpha * (th_state.temperature - T_ref))
         logger.debug("Nuclear parameters updated based on temperature.")
         return Sigma_a, Sigma_f, D
 
