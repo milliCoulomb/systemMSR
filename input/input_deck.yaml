@@ -38,7 +38,7 @@ nuclear_data:
   nu_fission: 2.4                # average number of neutrons per fission
   beta: 650e-5                   # delayed neutron fraction
   decay_constant: 0.1           # [1/s] decay constant of precursor
-  power: 8.0e6            # [W] target power of the reactor
+  power: 10.0e6            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
   neutron_velocity: 2.2e3        # [m/s] average neutron velocity
 
@@ -51,14 +51,14 @@ operational_parameters:
         flow_rate: 100.0           # kg/s
       - time: 200.0
         flow_rate: 100.0           # kg/s
-      - time: 250.0
-        flow_rate: 100.0           # kg/s
       - time: 300.0
-        flow_rate: 100.0           # kg/s
+        flow_rate: 20.0           # kg/s
       - time: 350.0
-        flow_rate: 100.0           # kg/s
+        flow_rate: 20.0           # kg/s
+      - time: 450.0
+        flow_rate: 20.0           # kg/s
       - time: 500.0
-        flow_rate: 100.0             # kg/s
+        flow_rate: 20.0             # kg/s
   
   pump_secondary:
     mode: "flow_rate_control"
@@ -83,10 +83,10 @@ operational_parameters:
       - time: 200.0
         temperature: 800.0        # [K]
       - time: 250.0
-        temperature: 700.0        # [K]
+        temperature: 800.0        # [K]
       - time: 300.0
-        temperature: 700.0        # [K]
+        temperature: 800.0        # [K]
       - time: 350.0
-        temperature: 700.0        # [K]
+        temperature: 800.0        # [K]
       - time: 500.0
-        temperature: 700.0        # [K]
+        temperature: 800.0        # [K]
