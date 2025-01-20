@@ -32,6 +32,9 @@ class TimeParameters:
     secondary_inlet_temperature_values: np.ndarray
     time_values_secondary_inlet_temperature: np.ndarray
 
+    accelerator_intensity_values: np.ndarray
+    time_values_accelerator_intensity: np.ndarray
+
     # now we use the class to define the parameters at each time step
 
     def __post_init__(self):
@@ -54,6 +57,13 @@ class TimeParameters:
             self.time_values,
             self.time_values_secondary_inlet_temperature,
             self.secondary_inlet_temperature_values,
+        )
+
+        # interpolate the accelerator intensity values
+        self.accelerator_intensity_values = np.interp(
+            self.time_values,
+            self.time_values_accelerator_intensity,
+            self.accelerator_intensity_values,
         )
 
         logger.info("Time parameters initialized.")
