@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # MAGIC CONSTANTS
-THETA = 1.0  # Implicitness parameter
+THETA = 0.5  # Implicitness parameter
 
 
 @dataclass
