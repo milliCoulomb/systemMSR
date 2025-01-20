@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # MAGIC NUMBERS
-THETA = 1.0
+THETA = 0.5
 
 
 @dataclass
@@ -287,6 +287,7 @@ class ThermoHydraulicsSolver:
         th_state_primary: ThermoHydraulicsState,
         th_state_secondary: ThermoHydraulicsState,
         neutronic_state: NeutronicsState,
+        old_neutronic_state: NeutronicsState,
     ):
         """
         Build the right-hand side vector for the time-dependent problem
@@ -319,6 +320,13 @@ class ThermoHydraulicsSolver:
             * self.params_primary.cp
             * self.core_geom.core_radius**2
             * np.pi
+        ) * THETA + old_neutronic_state.power_density / (
+            self.params_primary.rho
+            * self.params_primary.cp
+            * self.core_geom.core_radius**2
+            * np.pi
+        ) * (
+            1 - THETA
         )
         RHS_vector = np.concatenate([power_source, source_term_secondary])
         return RHS_vector
@@ -347,6 +355,7 @@ class ThermoHydraulicsSolver:
         th_state_primary: ThermoHydraulicsState,
         th_state_secondary: ThermoHydraulicsState,
         neutronic_state: NeutronicsState,
+        old_neutronic_state: NeutronicsState,
         dt: float,
     ):
         """
@@ -356,7 +365,7 @@ class ThermoHydraulicsSolver:
             th_state_primary, th_state_secondary
         )
         rhs_vector = self.build_time_dependent_rhs_vector(
-            th_state_primary, th_state_secondary, neutronic_state
+            th_state_primary, th_state_secondary, neutronic_state, old_neutronic_state
         )
         identity = diags(
             [np.ones(self.n_cells_primary + self.n_cells_secondary)],
