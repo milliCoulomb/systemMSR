@@ -35,31 +35,9 @@ def main():
     secondary_state = simulation_objects["secondary_state"]
     velocity = simulation_objects["velocity"]
     time_params = simulation_objects["time_params"]
-    time = time_params.time_values
+    th_params_primary = simulation_objects["th_params_primary"]
+    th_params_secondary = simulation_objects["th_params_secondary"]
     
-    # plot the pump schedule
-    plt.plot(time, time_params.pump_values_primary, label="Primary Pump")
-    plt.plot(time, time_params.pump_values_secondary, label="Secondary Pump")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Flow Rate [kg/s]")
-    plt.legend()
-    plt.show()
-
-    # initiate the thermo-hydraulics parameters
-    th_params_primary = ThermoHydraulicsParameters(
-        rho=input_deck.materials.primary_salt["density"],
-        cp=input_deck.materials.primary_salt["cp"],
-        k=input_deck.materials.primary_salt["k"],
-        heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
-        expansion_coefficient=input_deck.materials.primary_salt["expansion"],
-    )
-    th_params_secondary = ThermoHydraulicsParameters(
-        rho=input_deck.materials.secondary_salt["density"],
-        cp=input_deck.materials.secondary_salt["cp"],
-        k=input_deck.materials.secondary_salt["k"],
-        heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
-        expansion_coefficient=input_deck.materials.secondary_salt["expansion"],
-    )
     # solve the neutronics problem
     final_state = neut_solver.solve_static(core_state, th_params_primary)
     # plot the final neutron flux
@@ -91,7 +69,7 @@ def main():
     )
 
     # solve the coupled problem
-    number_of_iterations = 15
+    number_of_iterations = 20
     for _ in range(number_of_iterations):
         coupler = SteadyStateCoupler(th_solver, neut_solver)
         core_state, secondary_state, neutronic_state = coupler.solve(
@@ -172,53 +150,53 @@ def main():
     plt.show()
     plt.close()  # Ensure this is commented out
 
-    # Animation section
-    fig, ax = plt.subplots()
-    line, = ax.plot([], [], lw=2, color='tab:red')
+    # # Animation section
+    # fig, ax = plt.subplots()
+    # line, = ax.plot([], [], lw=2, color='tab:red')
 
-    # Precompute x
-    x = np.linspace(0, core_geom.core_length, len(core_states[index_to_start].temperature))
+    # # Precompute x
+    # x = np.linspace(0, core_geom.core_length, len(core_states[index_to_start].temperature))
 
-    # Compute min and max temperatures for y-axis limits
-    min_temp = np.min([np.min(state.temperature) for state in core_states[index_to_start:]])
-    max_temp = np.max([np.max(state.temperature) for state in core_states[index_to_start:]])
+    # # Compute min and max temperatures for y-axis limits
+    # min_temp = np.min([np.min(state.temperature) for state in core_states[index_to_start:]])
+    # max_temp = np.max([np.max(state.temperature) for state in core_states[index_to_start:]])
 
-    ax.set_xlim(0, core_geom.core_length)
-    ax.set_ylim(min_temp - 10, max_temp + 10)  # Set fixed y-axis limits
-    ax.set_xlabel("Position [m]")
-    ax.set_ylabel("Temperature [K]")
-    ax.set_title("Temperature Distribution in the Core")
+    # ax.set_xlim(0, core_geom.core_length)
+    # ax.set_ylim(min_temp - 10, max_temp + 10)  # Set fixed y-axis limits
+    # ax.set_xlabel("Position [m]")
+    # ax.set_ylabel("Temperature [K]")
+    # ax.set_title("Temperature Distribution in the Core")
 
-    # Initialization function: plot the background of each frame
-    def init():
-        line.set_data([], [])
-        return (line,)
+    # # Initialization function: plot the background of each frame
+    # def init():
+    #     line.set_data([], [])
+    #     return (line,)
 
-    # Animation function. This is called sequentially
-    def animate(i):
-        current_state = core_states[i + index_to_start]
-        y = current_state.temperature
-        line.set_data(x, y)
-        return (line,)
+    # # Animation function. This is called sequentially
+    # def animate(i):
+    #     current_state = core_states[i + index_to_start]
+    #     y = current_state.temperature
+    #     line.set_data(x, y)
+    #     return (line,)
 
-    # Determine number of frames
-    num_frames = len(core_states) - index_to_start
-    print(f"Number of frames for animation: {num_frames}")
+    # # Determine number of frames
+    # num_frames = len(core_states) - index_to_start
+    # print(f"Number of frames for animation: {num_frames}")
 
-    if num_frames <= 0:
-        raise ValueError("No frames to animate. Check 'index_to_start' and 'core_states' length.")
+    # if num_frames <= 0:
+    #     raise ValueError("No frames to animate. Check 'index_to_start' and 'core_states' length.")
 
-    # Create the animation
-    anim = animation.FuncAnimation(
-        fig, animate, init_func=init, frames=num_frames,
-        interval=200, blit=False  # Set blit=False for better compatibility
-    )
+    # # Create the animation
+    # anim = animation.FuncAnimation(
+    #     fig, animate, init_func=init, frames=num_frames,
+    #     interval=200, blit=False  # Set blit=False for better compatibility
+    # )
 
-    # Optionally, save the animation to a file
-    anim.save('temperature_animation.gif', writer='pillow', fps=5)
+    # # Optionally, save the animation to a file
+    # anim.save('temperature_animation.gif', writer='pillow', fps=5)
 
-    plt.show()
-    plt.close()  # Ensure this is commented out
+    # plt.show()
+    # plt.close()  # Ensure this is commented out
 
 
 if __name__ == "__main__":
