@@ -3,7 +3,7 @@
 simulation:
   total_time: 70.0          # [s] total simulation time
   time_step: 0.05e-1            # [s] base time-step
-  mode: "transient"          # "transient" or "steady_state"
+  mode: "steady_state"          # "transient" or "steady_state"
   neutronic_mode: "criticality" # "criticality" or "source_driven"
 
 geometry:
