@@ -39,6 +39,7 @@ class NeutronicsSolver:
         neutronic_parameters: NeutronicsParameters,
         method: Method,
         geometry: CoreGeometry,
+        mode: str,
     ):
         # Extract nuclear data
         self.params = neutronic_parameters
@@ -53,9 +54,12 @@ class NeutronicsSolver:
         self.C = np.zeros(self.n_cells)  # Initial precursor concentrations [n/m^3]
 
         self.method = method
-
-        # Time step will be handled externally
-        logger.info(f"Neutronics Solver initialized with {self.n_cells} cells.")
+        self.mode = mode
+        # check if the mode is valid
+        if self.mode not in ["source_driven", "criticality"]:
+            raise ValueError(
+                f"Invalid mode: {self.mode}. Mode must be either 'source_driven' or 'criticality'."
+            )
 
     def update_nuclear_parameters(
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
@@ -170,11 +174,11 @@ class NeutronicsSolver:
         Assemble the matrix for the neutron flux and precursor concentration eigenvalue problem at a given time step and temperature profile.
         """
         # build the operators
-        removal_flux = self.build_removal_op_flux(th_state, th_params)
-        removal_precs = self.build_removal_op_precursor(th_state, th_params)
-        decay_precursor = self.build_precursor_decay_op()
-        precursor_production = self.build_precursor_production_op(th_state, th_params)
-        fission_flux = self.build_prompt_fission_op(th_state, th_params)
+        removal_flux = self.build_removal_op_flux(th_state, th_params) # -d_x(D d_x(phi)) + Sigma_a phi
+        removal_precs = self.build_removal_op_precursor(th_state, th_params) # v d_x(C) + Lambda C
+        decay_precursor = self.build_precursor_decay_op() # Lambda
+        precursor_production = self.build_precursor_production_op(th_state, th_params) # nu * Sigma_f * phi * beta
+        fission_flux = self.build_prompt_fission_op(th_state, th_params) # nu * Sigma_f * phi * (1 - beta)
         empty = self.build_empty_op()
         # assemble the matrices
         LHS_blocks = [
@@ -207,6 +211,30 @@ class NeutronicsSolver:
         # assemble the matrices that apply to the vector (phi, C)
         operator = [[-removal_flux + fission_flux, decay_precursor], [precursor_production, -removal_precs]]
         return bmat(operator)
+    
+    def calculate_lineic_power_density(
+        self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
+    ) -> np.ndarray:
+        """
+        Calculate the lineic power density in the core.
+        """
+        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        mask = np.concatenate(
+            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
+        )
+        sigma_f = sigma_f * mask
+        power_density = (
+            neut_state.phi * sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2
+        )
+        logger.debug("Lineic power density calculated.")
+        return power_density
+    
+    def compute_power(self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> float:
+        """
+        Compute the power from the neutron flux distribution.
+        """
+        power_density = self.calculate_lineic_power_density(neut_state, th_state, th_params)
+        return np.sum(power_density * self.dx)
 
     def flux_normalization(
         self,
@@ -217,48 +245,18 @@ class NeutronicsSolver:
         """
         Normalize the neutron flux distribution to the power.
         """
-        # calculate the power
-        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
-        mask = np.concatenate(
-            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
-        )
-        sigma_f = sigma_f * mask
-        power = (
-            np.sum(neut_state.phi * sigma_f * self.dx)
-            * np.pi
-            * self.geom.core_radius**2
-            * self.params.kappa
-        )
+        power = self.compute_power(neut_state, th_state, th_params)
         # normalize the flux
         phi = neut_state.phi * self.params.power / power
         C = neut_state.C * self.params.power / power
-        power_density = (
-            phi * sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2
-        )
+        power_density = self.calculate_lineic_power_density(neut_state, th_state, th_params) * self.params.power / power
         logger.debug("Neutron flux normalized.")
         return NeutronicsState(
             phi=phi, C=C, keff=neut_state.keff, power=power, power_density=power_density
         )
-    
-    def compute_power(self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> float:
-        """
-        Compute the power from the neutron flux distribution.
-        """
-        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
-        mask = np.concatenate(
-            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
-        )
-        sigma_f = sigma_f * mask
-        power = (
-            np.sum(neut_state.phi * sigma_f * self.dx)
-            * np.pi
-            * self.geom.core_radius**2
-            * self.params.kappa
-        )
-        return power
 
-    def solve_static(
-        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
+    def _solve_static_critical(
+        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters, source: np.ndarray
     ) -> NeutronicsState:
         """
         Solve the neutron flux and precursor concentration eigenvalue problem at a given time step and temperature profile.
@@ -291,12 +289,62 @@ class NeutronicsSolver:
             th_params,
         )
     
-    def make_neutronic_time_step(
+    def _solve_static_source_driven(
+        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters, source: np.ndarray
+    ) -> NeutronicsState:
+        """
+        Solve the neutron flux and precursor concentration source-driven problem at a given time step and temperature profile.
+        """
+        # assemble the matrices
+        LHS_mat, RHS_mat = self.assemble_matrix_static(th_state, th_params)
+        # solve the system
+        matrix = LHS_mat - RHS_mat
+        phi_c = spla.spsolve(matrix, source)
+        # extract the solution and put it in the state
+        phi = phi_c[: self.n_cells]
+        C = phi_c[self.n_cells :]
+        # compute the new power lineic density
+        lineic_power_density = self.calculate_lineic_power_density(
+            NeutronicsState(phi=phi, C=C, keff=1.0, power=1.0, power_density=np.zeros_like(phi)),
+            th_state,
+            th_params,
+        )
+        power = self.calculate_power(
+            NeutronicsState(phi=phi, C=C, keff=1.0, power=1.0, power_density=lineic_power_density),
+            th_state,
+            th_params,
+        )
+        # initiate a new state
+        new_neut_state = NeutronicsState(
+            phi=phi,
+            C=C,
+            keff=1.0,
+            power=power,
+            power_density=lineic_power_density,
+        )
+        logger.debug("Neutronic problem solved.")
+        return new_neut_state
+
+    def solve_static(
+        self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters, source: np.ndarray, override_mode: str = None
+    ) -> NeutronicsState:
+        """
+        Solve the neutron flux and precursor concentration problem at a given time step and temperature profile.
+        """
+        if override_mode is not None:
+            self.mode = override_mode
+        if self.mode == "criticality":
+            return self._solve_static_critical(th_state, th_params, np.zeros(self.n_cells))
+        elif self.mode == "source_driven":
+            return self._solve_static_source_driven(th_state, th_params, source)
+    
+    def _make_neutronic_time_step_critical(
         self,
         th_state: ThermoHydraulicsState,
         th_params: ThermoHydraulicsParameters,
         neut_state: NeutronicsState,
         dt: float,
+        source: np.ndarray,
     ) -> NeutronicsState:
         """
         Make a time step for the neutron flux and precursor concentration.
@@ -324,3 +372,30 @@ class NeutronicsSolver:
         )
         logger.debug("Neutronic time step made.")
         return new_neut_state
+    
+    def _make_neutronic_time_step_source_driven(
+        self,
+        th_state: ThermoHydraulicsState,
+        th_params: ThermoHydraulicsParameters,
+        neut_state: NeutronicsState,
+        dt: float,
+        source: np.ndarray,
+    ) -> NeutronicsState:
+        # raise NotImplementedError("Source-driven mode not implemented yet.")
+        raise NotImplementedError("Source-driven mode not implemented yet.")
+    
+    def make_neutronic_time_step(
+        self,
+        th_state: ThermoHydraulicsState,
+        th_params: ThermoHydraulicsParameters,
+        neut_state: NeutronicsState,
+        dt: float,
+        source: np.ndarray,
+    ) -> NeutronicsState:
+        """
+        Make a time step for the neutron flux and precursor concentration.
+        """
+        if self.mode == "criticality":
+            return self._make_neutronic_time_step_critical(th_state, th_params, neut_state, dt, np.zeros(self.n_cells))
+        elif self.mode == "source_driven":
+            return self._make_neutronic_time_step_source_driven(th_state, th_params, neut_state, dt, source)
