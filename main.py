@@ -28,8 +28,7 @@ def main():
         if simulation_objects["neutronic_mode"] == "criticality":
             # solve the steady state criticality problem
             source = np.zeros(
-                simulation_objects["core_geom"].n_core
-                + simulation_objects["core_geom"].n_exchanger
+                simulation_objects["neut_solver"].n_cells
             )
             # solve the uncoupled problem
             initial_neutronics_state = simulation_objects["neut_solver"].solve_static(
@@ -41,7 +40,7 @@ def main():
             coupler = SteadyStateCoupler(
                 simulation_objects["th_solver"],
                 simulation_objects["neut_solver"],
-                simulation_objects["neutronics_mode"],
+                simulation_objects["neutronic_mode"],
             )
             (
                 simulation_objects["core_state"],
