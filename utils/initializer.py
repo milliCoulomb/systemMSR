@@ -114,7 +114,7 @@ def initialize_simulation(input_deck):
     )
 
     # assess the mode of the simulation, can be "steady-state" or "transient", otherwise raise an error
-    if input_deck.simulation.mode.lower() not in ["steady-state", "transient"]:
+    if input_deck.simulation.mode.lower() not in ["steady_state", "transient"]:
         raise ValueError("Simulation mode must be 'steady-state' or 'transient'")
     
     # assess the mode of the accelerator, can be "on" or "off", otherwise raise an error
