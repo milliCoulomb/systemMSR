@@ -7,21 +7,9 @@ from methods.fvm import FVM
 from physics.neutronics import NeutronicsSolver
 from utils.states import ThermoHydraulicsState
 from utils.time_parameters import TimeParameters
-from physics.thermo import ThermoHydraulicsParameters
+from physics.thermo import ThermoHydraulicsParameters, ThermoHydraulicsSolver
 
-def initialize_simulation(input_deck):
-    # Print simulation parameters
-    print(f"Total Simulation Time: {input_deck.simulation.total_time} s")
-    print(f"Time Step: {input_deck.simulation.time_step} s")
-    
-    print(f"Core Length: {input_deck.geometry.core_length} m")
-    print(f"Heat Exchanger Coefficient: {input_deck.geometry.heat_exchanger_coefficient} W/m^3-K")
-    
-    print(f"Primary Salt Density: {input_deck.materials.primary_salt['density']} kg/m^3")
-    print(f"Secondary Salt CP: {input_deck.materials.secondary_salt['cp']} J/kg-K")
-    
-    print(f"Nuclear Diffusion Coefficient: {input_deck.nuclear_data.diffusion_coefficient} m")
-    
+def initialize_simulation(input_deck):    
     # Initialize pump schedules
     pump_primary = initialize_pump_schedule("Primary", input_deck)
     pump_secondary = initialize_pump_schedule("Secondary", input_deck)
@@ -67,7 +55,9 @@ def initialize_simulation(input_deck):
     # Initialize solvers
     fvm = FVM(core_geom.dx)
     fvm_secondary = FVM(secondary_geom.dx)
-    neut_solver = NeutronicsSolver(neut_params, fvm, core_geom)
+    # read the neutronic_mode from the input deck
+    
+    neut_solver = NeutronicsSolver(neut_params, fvm, core_geom, mode=input_deck.simulation.neutronic_mode)
 
     # initialize the thermo-hydraulics parameters
     th_params_primary = ThermoHydraulicsParameters(
@@ -84,6 +74,16 @@ def initialize_simulation(input_deck):
         heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
         expansion_coefficient=input_deck.materials.secondary_salt["expansion"],
     )
+
+    # Initialize thermohydraulics solvers
+    th_solver = ThermoHydraulicsSolver(
+        th_params_primary=th_params_primary,
+        th_params_secondary=th_params_secondary,
+        method_primary=fvm,
+        core_geom=core_geom,
+        method_secondary=fvm_secondary,
+        secondary_geom=secondary_geom,
+    )
     
     # Initialize thermohydraulics states
     core_state = ThermoHydraulicsState(
@@ -95,10 +95,6 @@ def initialize_simulation(input_deck):
         temperature=np.ones_like(secondary_geom.dx) * 900.0,
         flow_rate=pump_secondary['rates'][0],
         T_in=temps_sec_in_temp[0],
-    )
-    
-    velocity = core_state.flow_rate / (
-        input_deck.materials.primary_salt["density"] * np.pi * core_geom.core_radius**2
     )
     
     # Initialize time parameters
@@ -121,6 +117,10 @@ def initialize_simulation(input_deck):
     if input_deck.simulation.mode.lower() not in ["steady-state", "transient"]:
         raise ValueError("Simulation mode must be 'steady-state' or 'transient'")
     
+    # assess the mode of the accelerator, can be "on" or "off", otherwise raise an error
+    if input_deck.simulation.neutronic_mode.lower() not in ["criticality", "source_driven"]:
+        raise ValueError("Neutronic mode must be 'criticality' or 'source_driven'")
+    
     return {
         "core_geom": core_geom,
         "secondary_geom": secondary_geom,
@@ -128,12 +128,14 @@ def initialize_simulation(input_deck):
         "fvm": fvm,
         "fvm_secondary": fvm_secondary,
         "neut_solver": neut_solver,
+        "th_solver": th_solver,
         "core_state": core_state,
         "secondary_state": secondary_state,
         "th_params_primary": th_params_primary,
         "th_params_secondary": th_params_secondary,
         "time_params": time_params,
-        "mode": input_deck.simulation.mode.lower(),
+        "simulation_mode": input_deck.simulation.mode,
+        "neutronic_mode": input_deck.simulation.neutronic_mode,
     }
 
 def initialize_pump_schedule(pump_type, input_deck):
