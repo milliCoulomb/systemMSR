@@ -4,6 +4,7 @@ simulation:
   total_time: 70.0          # [s] total simulation time
   time_step: 0.05e-1            # [s] base time-step
   mode: "transient"          # "transient" or "steady_state"
+  neutronic_mode: "criticality" # "criticality" or "source_driven"
 
 geometry:
   core_length: 3.0           # [m] length of the core region
@@ -103,7 +104,6 @@ operational_parameters:
       #   temperature: 800.0        # [K]
     
   accelerator:
-    mode: "intensity_control"
     electron_to_gamma: 1.0
     schedule:
       - time: 0.0
