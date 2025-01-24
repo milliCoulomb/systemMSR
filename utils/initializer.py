@@ -116,6 +116,10 @@ def initialize_simulation(input_deck):
         accelerator_intensity_values=intensity,
         time_values_accelerator_intensity=times_acc,
     )
+
+    # assess the mode of the simulation, can be "steady-state" or "transient", otherwise raise an error
+    if input_deck.simulation.mode.lower() not in ["steady-state", "transient"]:
+        raise ValueError("Simulation mode must be 'steady-state' or 'transient'")
     
     return {
         "core_geom": core_geom,
@@ -129,6 +133,7 @@ def initialize_simulation(input_deck):
         "th_params_primary": th_params_primary,
         "th_params_secondary": th_params_secondary,
         "time_params": time_params,
+        "mode": input_deck.simulation.mode.lower(),
     }
 
 def initialize_pump_schedule(pump_type, input_deck):
