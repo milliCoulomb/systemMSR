@@ -21,7 +21,6 @@ class SecondaryInletTempModel(BaseModel):
     schedule: List[SchedulePointModel]
 
 class AcceleratorModel(BaseModel):
-    mode: str
     schedule: List[SchedulePointModel]
     electron_to_gamma: float
 
@@ -63,6 +62,7 @@ class SimulationModel(BaseModel):
     total_time: float
     time_step: float
     mode: str
+    neutronic_mode: str
 
 class InputDeckModel(BaseModel):
     simulation: SimulationModel
@@ -98,36 +98,3 @@ class InputDeck:
             nuclear_data=input_model.nuclear_data,
             operational_parameters=input_model.operational_parameters
         )
-    
-    def get_pump_flow_rate(self, pump: PumpModel, current_time: float) -> float:
-        """Interpolate the flow rate for a given pump at the current time."""
-        times = np.array([point.time for point in pump.schedule])
-        rates = np.array([point.flow_rate for point in pump.schedule])
-        
-        if current_time <= times[0]:
-            return rates[0]
-        elif current_time >= times[-1]:
-            return rates[-1]
-        else:
-            idx = np.searchsorted(times, current_time) - 1
-            t1, t2 = times[idx], times[idx + 1]
-            r1, r2 = rates[idx], rates[idx + 1]
-            # Linear interpolation
-            return r1 + (r2 - r1) * (current_time - t1) / (t2 - t1)
-    
-    def get_secondary_inlet_temp(self, current_time: float) -> float:
-        """Interpolate the secondary inlet temperature at the current time."""
-        schedule = self.operational_parameters.secondary_inlet_temp.schedule
-        times = np.array([point.time for point in schedule])
-        temps = np.array([point.temperature for point in schedule])
-        
-        if current_time <= times[0]:
-            return temps[0]
-        elif current_time >= times[-1]:
-            return temps[-1]
-        else:
-            idx = np.searchsorted(times, current_time) - 1
-            t1, t2 = times[idx], times[idx + 1]
-            temp1, temp2 = temps[idx], temps[idx + 1]
-            # Linear interpolation
-            return temp1 + (temp2 - temp1) * (current_time - t1) / (t2 - t1)
