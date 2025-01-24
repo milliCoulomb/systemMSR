@@ -63,6 +63,10 @@ class UnsteadyCoupler:
             current_th_state_secondary.T_in = (
                 time_parameters.secondary_inlet_temperature_values[i]
             )
+            current_source = time_parameters.accelerator_intensity_values[i] * np.ones(
+                self.neutronics_solver.n_cells
+            )
+            
             while (
                 residual_flux > RESIDUAL_FLUX
                 and residual_temperature > RESIDUAL_TEMPERATURE
@@ -72,6 +76,7 @@ class UnsteadyCoupler:
                     neut_state=current_neutronics_state,
                     th_params=self.th_solver.params_primary,
                     dt=time_parameters.time_step,
+                    source=current_source,
                 )
                 # solve thermohydraulics
                 th_primary_step, th_secondary_step = self.th_solver.make_time_step(
@@ -102,6 +107,4 @@ class UnsteadyCoupler:
             list_neutronics.append(current_neutronics_state)
             residual_flux = 1.0
             residual_temperature = 1.0
-            
-        
         return list_th_primary, list_th_secondary, list_neutronics
