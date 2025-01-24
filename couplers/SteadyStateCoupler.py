@@ -25,15 +25,24 @@ class SteadyStateCoupler:
         self,
         th_solver: ThermoHydraulicsSolver,
         neutronics_solver: NeutronicsSolver,
+        mode: str,
     ):
         self.th_solver = th_solver
         self.neutronics_solver = neutronics_solver
+        # assess the mode of the simulation, can be "source_driven" or "criticality"
+        self.mode = mode
+        # check if the mode is valid
+        if self.mode not in ["source_driven", "criticality"]:
+            raise ValueError(
+                f"Invalid mode: {self.mode}. Mode must be either 'source_driven' or 'criticality'."
+            )
 
     def solve(
         self,
         th_state_primary: ThermoHydraulicsState,
         th_state_secondary: ThermoHydraulicsState,
         initial_neutronics_state: NeutronicsState,
+        source: np.ndarray,
     ):
         """
         Solve the steady-state coupled problem.
@@ -49,7 +58,7 @@ class SteadyStateCoupler:
         ):
             # solve neutronics first
             neutronic_step = self.neutronics_solver.solve_static(
-                th_state_primary, self.th_solver.params_primary
+                th_state_primary, self.th_solver.params_primary, source
             )
             # solve thermohydraulics
             th_primary_step, th_secondary_step = self.th_solver.solve_static(
