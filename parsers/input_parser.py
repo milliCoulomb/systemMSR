@@ -62,6 +62,7 @@ class GeometryModel(BaseModel):
 class SimulationModel(BaseModel):
     total_time: float
     time_step: float
+    mode: str
 
 class InputDeckModel(BaseModel):
     simulation: SimulationModel
