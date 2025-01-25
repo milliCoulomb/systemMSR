@@ -25,7 +25,9 @@ class NeutronicsParameters:
     D: float  # Diffusion coefficient [m]
     Sigma_a: float  # Absorption cross-section [1/m]
     Sigma_f: float  # Fission cross-section [1/m]
+    Sigma_photofission: float  # Photofission cross-section [1/m]
     nu_fission: float  # Average neutrons per fission
+    nu_photofission: float  # Average neutrons per photofission
     beta: float  # Delayed neutron fraction
     Lambda: float  # Decay constant [1/s]
     kappa: float  # energy release per fission [J]
@@ -75,9 +77,10 @@ class NeutronicsSolver:
         # calculate the temperature-dependent cross sections
         Sigma_a = self.params.Sigma_a * np.exp(- alpha * (th_state.temperature - T_ref))
         Sigma_f = self.params.Sigma_f * np.exp(- alpha * (th_state.temperature - T_ref))
+        Sigma_photofission = self.params.Sigma_photofission * np.exp(- alpha * (th_state.temperature - T_ref))
         D = self.params.D * np.exp(alpha * (th_state.temperature - T_ref))
         logger.debug("Nuclear parameters updated based on temperature.")
-        return Sigma_a, Sigma_f, D
+        return Sigma_a, Sigma_f, D, Sigma_photofission
 
     def build_removal_op_flux(
         self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
@@ -86,7 +89,7 @@ class NeutronicsSolver:
         Build the removal operator for the neutron flux. (diffusion + absorption, or -d_x(D d_x(phi)) + Sigma_a phi)
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
-        Sigma_a, _, D = self.update_nuclear_parameters(
+        Sigma_a, _, D, _ = self.update_nuclear_parameters(
             th_state=th_state, th_params=th_params
         )
         diffusion_flux = self.method.build_stif(D)
@@ -118,7 +121,7 @@ class NeutronicsSolver:
         Build the operator for the production of delayed neutron precursors (nu * Sigma_f * phi * beta).
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
-        _, Sigma_f, _ = self.update_nuclear_parameters(
+        _, Sigma_f, _, _ = self.update_nuclear_parameters(
             th_state=th_state, th_params=th_params
         )
         Sigma_f = np.concatenate(
@@ -145,7 +148,7 @@ class NeutronicsSolver:
         Build the operator for the prompt fission neutrons (nu * Sigma_f * phi * (1 - beta)).
         """
         # evaluate the cross sections and diffusion coefficient at the given temperature
-        _, Sigma_f, _ = self.update_nuclear_parameters(
+        _, Sigma_f, _, _ = self.update_nuclear_parameters(
             th_state=th_state, th_params=th_params
         )
         Sigma_f = np.concatenate(
@@ -189,7 +192,6 @@ class NeutronicsSolver:
             [fission_flux, empty],
             [precursor_production, empty],
         ]
-        print(f"Shape of empty: {empty.shape}")
         LHS_mat = bmat(LHS_blocks)
         RHS_mat = bmat(RHS_blocks)
         logger.debug("Matrix assembled for the eigenvalue problem.")
@@ -218,7 +220,7 @@ class NeutronicsSolver:
         """
         Calculate the lineic power density in the core.
         """
-        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
         mask = np.concatenate(
             [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
         )
@@ -235,6 +237,13 @@ class NeutronicsSolver:
         """
         power_density = self.calculate_lineic_power_density(neut_state, th_state, th_params)
         return np.sum(power_density * self.dx)
+    
+    def compute_photofission_source(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters, beam_intensity: np.ndarray) -> np.ndarray:
+        """
+        Compute the photofission source term.
+        """
+        _, _, _, Sigma_photofission = self.update_nuclear_parameters(th_state, th_params)
+        return np.concatenate([Sigma_photofission * beam_intensity * self.params.nu_photofission, np.zeros(self.n_cells)])
 
     def flux_normalization(
         self,
@@ -295,11 +304,13 @@ class NeutronicsSolver:
         """
         Solve the neutron flux and precursor concentration source-driven problem at a given time step and temperature profile.
         """
+        print("Using source-driven mode.")
         # assemble the matrices
         LHS_mat, RHS_mat = self.assemble_matrix_static(th_state, th_params)
         # solve the system
         matrix = LHS_mat - RHS_mat
-        phi_c = spla.spsolve(matrix, source)
+        photofission_source = self.compute_photofission_source(th_state, th_params, source)
+        phi_c = spla.spsolve(matrix, photofission_source)
         # extract the solution and put it in the state
         phi = phi_c[: self.n_cells]
         C = phi_c[self.n_cells :]
@@ -309,7 +320,7 @@ class NeutronicsSolver:
             th_state,
             th_params,
         )
-        power = self.calculate_power(
+        power = self.compute_power(
             NeutronicsState(phi=phi, C=C, keff=1.0, power=1.0, power_density=lineic_power_density),
             th_state,
             th_params,
@@ -359,7 +370,7 @@ class NeutronicsSolver:
         phi_new = phi_c_new[: self.n_cells]
         C_new = phi_c_new[self.n_cells :]
         # compute the new power lineic density
-        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
         pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi_new
         new_power = np.sum(pv * self.dx)
         # initiate a new state
