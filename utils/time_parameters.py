@@ -34,6 +34,8 @@ class TimeParameters:
 
     accelerator_intensity_values: np.ndarray
     time_values_accelerator_intensity: np.ndarray
+    accelerator_center: float
+    accelerator_width: float
 
     # now we use the class to define the parameters at each time step
 
