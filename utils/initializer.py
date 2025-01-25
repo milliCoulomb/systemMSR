@@ -44,7 +44,9 @@ def initialize_simulation(input_deck):
         D=nuc.diffusion_coefficient,
         Sigma_a=nuc.absorption_cross_section,
         Sigma_f=nuc.fission_cross_section,
+        Sigma_photofission=nuc.photofission_cross_section,
         nu_fission=nuc.nu_fission,
+        nu_photofission=nuc.nu_phifission,
         beta=nuc.beta,
         Lambda=nuc.decay_constant,
         kappa=nuc.kappa,
@@ -111,6 +113,8 @@ def initialize_simulation(input_deck):
         time_values_secondary_inlet_temperature=times_sec_in_temp,
         accelerator_intensity_values=intensity,
         time_values_accelerator_intensity=times_acc,
+        accelerator_center=input_deck.operational_parameters.accelerator.position,
+        accelerator_width=input_deck.operational_parameters.accelerator.width,
     )
 
     # assess the mode of the simulation, can be "steady-state" or "transient", otherwise raise an error
