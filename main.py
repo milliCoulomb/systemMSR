@@ -92,19 +92,46 @@ def main():
 
             # print the final keff
             print(f"Final keff: {final_state.keff}")
-        elif simulation_objects["neutronics_mode"] == "source_driven":
-            # in this case, we take the first source value in time_params, it is a Dirac centered at n_core // 2
-            source = np.zeros(
-                simulation_objects["core_geom"].n_core
-                + simulation_objects["core_geom"].n_exchanger
+        elif simulation_objects["neutronic_mode"] == "source_driven":
+            # we first override the mode of the neutronics solver and check if the uncoupled problem is solvable
+            beam_center = simulation_objects["time_params"].accelerator_center
+            beam_width = simulation_objects["time_params"].accelerator_width
+            beam_intensity = simulation_objects["time_params"].accelerator_intensity_values[0]
+            # source is a Gaussian distribution of the beam intensity centered at the beam center with a width of the beam width
+            x = np.linspace(
+                0,
+                simulation_objects["core_geom"].core_length
+                + simulation_objects["core_geom"].exchanger_length,
+                simulation_objects["core_geom"].n_cells_core + simulation_objects["core_geom"].n_cells_exchanger,
             )
-            source[simulation_objects["core_geom"].n_core // 2] = simulation_objects[
-                "time_params"
-            ].accelerator_intensity_values[0]
+
+            source = beam_intensity * np.exp(
+                -((x - beam_center) ** 2)
+                / (2 * beam_width ** 2)
+            )
+
+            # plot the source
+            plt.plot(x, source)
+            plt.xlabel("Position [m]")
+            plt.ylabel("Gamma flux [n/m^2-s]")
+            plt.title("Source Distribution")
+            plt.show()
+            plt.close()
+            
+            initial_neutronics_state = simulation_objects["neut_solver"].solve_static(
+                th_state=simulation_objects["core_state"],
+                th_params=simulation_objects["th_params_primary"],
+                source=source,
+                override_mode="criticality",
+            )
+            if initial_neutronics_state.keff > 1.0:
+                raise ValueError(
+                    "The source driven mode is not solvable for the given problem (keff > 1.0)"
+                )
             coupler = SteadyStateCoupler(
                 simulation_objects["th_solver"],
                 simulation_objects["neut_solver"],
-                simulation_objects["neutronics_mode"],
+                simulation_objects["neutronic_mode"],
             )
             (
                 simulation_objects["core_state"],
@@ -113,16 +140,10 @@ def main():
             ) = coupler.solve(
                 simulation_objects["core_state"],
                 simulation_objects["secondary_state"],
-                simulation_objects["neut_params"],
+                initial_neutronics_state=initial_neutronics_state,
                 source=source,
             )
-            # plot the final states
-            x = np.linspace(
-                0,
-                simulation_objects["core_geom"].core_length
-                + simulation_objects["core_geom"].exchanger_length,
-                len(final_state.phi),
-            )
+
             plt.plot(x, final_state.phi)
             plt.xlabel("Position [m]")
             plt.ylabel("Neutron Flux [n/m^2-s]")
@@ -152,6 +173,8 @@ def main():
             plt.ylabel("Temperature [K]")
             plt.show()
             plt.close()
+
+            print(f"Final power: {final_state.power / 1e6} MW")
         else:
             raise ValueError("Invalid neutronics mode")
     elif simulation_objects["simulation_mode"] == "transient":
