@@ -2,7 +2,7 @@
 
 simulation:
   total_time: 70.0          # [s] total simulation time
-  time_step: 0.05e-1            # [s] base time-step
+  time_step: 0.1e-1            # [s] base time-step
   mode: "steady_state"          # "transient" or "steady_state"
   neutronic_mode: "criticality" # "criticality" or "source_driven"
 
@@ -36,9 +36,11 @@ materials:
 nuclear_data:
   diffusion_coefficient: 1.21e-2      # [m]   e.g. D
   absorption_cross_section: 3.76e-1  # [1/m] e.g. Sigma_a
-  fission_cross_section: 1.85e-1     # [1/m] e.g. Sigma_f
+  fission_cross_section: 1.35e-1     # [1/m] e.g. Sigma_f (1.85e-1)
+  photofission_cross_section: 1.0e-1 # [1/m] e.g. Sigma_phif
   nu_fission: 2.4                # average number of neutrons per fission
-  beta: 1e-6                   # delayed neutron fraction
+  nu_phifission: 2.4             # average number of neutrons per photofission
+  beta: 70e-5                   # delayed neutron fraction
   decay_constant: 0.1           # [1/s] decay constant of precursor
   power: 300e6            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
@@ -54,13 +56,9 @@ operational_parameters:
       - time: 20.0
         flow_rate: 4000.0           # kg/s
       - time: 25.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 2000.0           # kg/s
       - time: 70.0
-        flow_rate: 4000.0           # kg/s
-      # - time: 200.0
-      #   flow_rate: 2000.0           # kg/s
-      # - time: 1000.0
-      #   flow_rate: 400.0             # kg/s
+        flow_rate: 2000.0           # kg/s
   
   pump_secondary:
     mode: "flow_rate_control"
@@ -77,10 +75,6 @@ operational_parameters:
         flow_rate: 4000.0           # kg/s
       - time: 70.0
         flow_rate: 4000.0           # kg/s
-      # - time: 110.0
-      #   flow_rate: 4000.0           # kg/s
-      # - time: 200.0
-      #   flow_rate: 4000.0           # kg/s
 
   secondary_inlet_temp:
     schedule:
@@ -89,25 +83,17 @@ operational_parameters:
       - time: 20.0
         temperature: 800.0        # [K]
       - time: 20.5
-        temperature: 700.0        # [K]
+        temperature: 800.0        # [K]
       - time: 70.0
-        temperature: 700.0        # [K]
-      # - time: 250.0
-      #   temperature: 800.0        # [K]
-      # - time: 300.0
-      #   temperature: 800.0        # [K]
-      # - time: 350.0
-      #   temperature: 800.0        # [K]
-      # - time: 500.0
-      #   temperature: 800.0        # [K]
-      # - time: 1000.0
-      #   temperature: 800.0        # [K]
+        temperature: 800.0        # [K]
     
   accelerator:
     electron_to_gamma: 1.0
+    position: 1.5              # [m] position of the accelerator
+    width: 0.1                 # [m] width of gaussian beam
     schedule:
       - time: 0.0
-        intensity: 50.0            # [W]
+        intensity: 50.0e18            # [W]
       - time: 200.0
         intensity: 50.0            # [W]
       - time: 250.0
