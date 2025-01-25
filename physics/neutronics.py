@@ -209,34 +209,26 @@ class NeutronicsSolver:
         decay_precursor = self.build_precursor_decay_op() * self.params.neutron_velocity # Lambda * v
         precursor_production = self.build_precursor_production_op(th_state, th_params) # nu * Sigma_f * phi * beta
         fission_flux = self.build_prompt_fission_op(th_state, th_params) * self.params.neutron_velocity # nu * Sigma_f * phi * (1 - beta) * v
-        empty = self.build_empty_op()
         # assemble the matrices that apply to the vector (phi, C)
         operator = [[-removal_flux + fission_flux, decay_precursor], [precursor_production, -removal_precs]]
         return bmat(operator)
-    
-    def calculate_lineic_power_density(
-        self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters
-    ) -> np.ndarray:
-        """
-        Calculate the lineic power density in the core.
-        """
-        _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
-        mask = np.concatenate(
-            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
-        )
-        sigma_f = sigma_f * mask
-        power_density = (
-            neut_state.phi * sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2
-        )
-        logger.debug("Lineic power density calculated.")
-        return power_density
     
     def compute_power(self, neut_state: NeutronicsState, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters) -> float:
         """
         Compute the power from the neutron flux distribution.
         """
-        power_density = self.calculate_lineic_power_density(neut_state, th_state, th_params)
-        return np.sum(power_density * self.dx)
+        _, sigma_f, _ = self.update_nuclear_parameters(th_state, th_params)
+        mask = np.concatenate(
+            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
+        )
+        sigma_f = sigma_f * mask
+        power = (
+            np.sum(neut_state.phi * sigma_f * self.dx)
+            * np.pi
+            * self.geom.core_radius**2
+            * self.params.kappa
+        )
+        return power
     
     def compute_photofission_source(self, th_state: ThermoHydraulicsState, th_params: ThermoHydraulicsParameters, beam_intensity: np.ndarray) -> np.ndarray:
         """
@@ -254,11 +246,24 @@ class NeutronicsSolver:
         """
         Normalize the neutron flux distribution to the power.
         """
-        power = self.compute_power(neut_state, th_state, th_params)
+        # calculate the power
+        _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
+        mask = np.concatenate(
+            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
+        )
+        sigma_f = sigma_f * mask
+        power = (
+            np.sum(neut_state.phi * sigma_f * self.dx)
+            * np.pi
+            * self.geom.core_radius**2
+            * self.params.kappa
+        )
         # normalize the flux
         phi = neut_state.phi * self.params.power / power
         C = neut_state.C * self.params.power / power
-        power_density = self.calculate_lineic_power_density(neut_state, th_state, th_params) * self.params.power / power
+        power_density = (
+            phi * sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2
+        )
         logger.debug("Neutron flux normalized.")
         return NeutronicsState(
             phi=phi, C=C, keff=neut_state.keff, power=power, power_density=power_density
@@ -315,23 +320,20 @@ class NeutronicsSolver:
         phi = phi_c[: self.n_cells]
         C = phi_c[self.n_cells :]
         # compute the new power lineic density
-        lineic_power_density = self.calculate_lineic_power_density(
-            NeutronicsState(phi=phi, C=C, keff=1.0, power=1.0, power_density=np.zeros_like(phi)),
-            th_state,
-            th_params,
+        mask = np.concatenate(
+            [np.ones(self.geom.n_cells_core), np.zeros(self.geom.n_cells_exchanger)]
         )
-        power = self.compute_power(
-            NeutronicsState(phi=phi, C=C, keff=1.0, power=1.0, power_density=lineic_power_density),
-            th_state,
-            th_params,
-        )
+        _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
+        sigma_f = sigma_f * mask
+        pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi
+        power = np.sum(pv * self.dx)
         # initiate a new state
         new_neut_state = NeutronicsState(
             phi=phi,
             C=C,
             keff=1.0,
             power=power,
-            power_density=lineic_power_density,
+            power_density=pv,
         )
         logger.debug("Neutronic problem solved.")
         return new_neut_state
