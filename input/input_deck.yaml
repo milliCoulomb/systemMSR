@@ -25,18 +25,18 @@ materials:
   primary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 2.12e-2             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
   secondary_salt:
     density:   2250.0              # [kg/m^3], constant
     cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 2.12e-2             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
 
 nuclear_data:
   diffusion_coefficient: 1.21e-2      # [m]   e.g. D
   absorption_cross_section: 3.76e-1  # [1/m] e.g. Sigma_a
-  fission_cross_section: 1.35e-1     # [1/m] e.g. Sigma_f (1.85e-1)
+  fission_cross_section: 1.85e-1     # [1/m] e.g. Sigma_f (1.85e-1)
   photofission_cross_section: 1.0e-1 # [1/m] e.g. Sigma_phif
   nu_fission: 2.4                # average number of neutrons per fission
   nu_phifission: 2.4             # average number of neutrons per photofission
