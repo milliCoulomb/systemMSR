@@ -57,8 +57,9 @@ class SteadyStateCoupler:
             or residual_temperature > RESIDUAL_TEMPERATURE
         ):
             # solve neutronics first
+            print(th_state_primary.temperature)
             neutronic_step = self.neutronics_solver.solve_static(
-                th_state_primary, self.th_solver.params_primary, source
+                th_state_primary, self.th_solver.params_primary, source, override_mode=self.mode
             )
             # solve thermohydraulics
             th_primary_step, th_secondary_step = self.th_solver.solve_static(
@@ -67,16 +68,20 @@ class SteadyStateCoupler:
                 neutronic_state=neutronic_step,
             )
             # calculate residuals
-            residual_k = (
-                np.abs(neutronic_step.keff - initial_neutronics_state.keff)
-                / initial_neutronics_state.keff
-            )
+            if self.mode == "criticality":
+                residual_k = (
+                    np.abs(neutronic_step.keff - initial_neutronics_state.keff)
+                    / initial_neutronics_state.keff
+                )
+            else:
+                residual_k = 0.0
             residual_flux = np.linalg.norm(
                 neutronic_step.phi - initial_neutronics_state.phi
             ) / np.linalg.norm(initial_neutronics_state.phi)
             residual_temperature = np.linalg.norm(
                 th_primary_step.temperature - th_state_primary.temperature
             ) / np.linalg.norm(th_state_primary.temperature)
+            print(residual_temperature)
             # update states
             th_state_primary = th_primary_step
             th_state_secondary = th_secondary_step
