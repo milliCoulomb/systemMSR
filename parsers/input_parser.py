@@ -4,8 +4,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import yaml
 from pydantic import BaseModel, ValidationError, validator
-import bisect
-import numpy as np
 
 class SchedulePointModel(BaseModel):
     time: float
@@ -23,6 +21,8 @@ class SecondaryInletTempModel(BaseModel):
 class AcceleratorModel(BaseModel):
     schedule: List[SchedulePointModel]
     electron_to_gamma: float
+    position: float
+    width: float
 
 class OperationalParametersModel(BaseModel):
     pump_primary: PumpModel
@@ -38,7 +38,9 @@ class NuclearDataModel(BaseModel):
     diffusion_coefficient: float
     absorption_cross_section: float
     fission_cross_section: float
+    photofission_cross_section: float
     nu_fission: float
+    nu_phifission: float
     beta: float
     decay_constant: float
     kappa: float
