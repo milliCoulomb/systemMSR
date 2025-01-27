@@ -1,8 +1,9 @@
 # main.py
 import numpy as np
+import os
+import logging
 from parsers.input_parser import InputDeck
 from physics.neutronics import NeutronicsSolver
-from physics.thermo import ThermoHydraulicsSolver
 import matplotlib.pyplot as plt
 from utils.initializer import initialize_simulation
 from couplers.SteadyStateCoupler import SteadyStateCoupler
@@ -11,8 +12,34 @@ from couplers.UnsteadyCoupler import UnsteadyCoupler
 # MAGIC CONSTANTS
 NUMBER_OF_RENORMALIZATION_ITERATIONS = 20
 
+def setup_logging():
+    """Configure logging to file and console."""
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "simulation.log")
+    
+    # Define logging format
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # Configure the root logger
+    logging.basicConfig(
+        level=logging.DEBUG,  # Set to DEBUG to capture all levels
+        format=log_format,
+        handlers=[
+            logging.FileHandler(log_file, mode='w'),  # Overwrite log file each run
+            logging.StreamHandler()  # Also output to console
+        ]
+    )
+    
+    # Set terminal logging level to DEBUG
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(logging.Formatter(log_format))
+    logging.getLogger().addHandler(console_handler)
+
 
 def main():
+    setup_logging()
     # Path to your input deck
     input_deck_path = "input/input_deck.yaml"
 
@@ -30,25 +57,31 @@ def main():
             source = np.zeros(
                 simulation_objects["neut_solver"].n_cells
             )
+            neut_solver = simulation_objects["neut_solver"]
+            core_state = simulation_objects["core_state"]
+            secondary_state = simulation_objects["secondary_state"]
+            th_params_primary = simulation_objects["th_params_primary"]
+            print(th_params_primary.expansion_coefficient)
+            th_solver = simulation_objects["th_solver"]
             # solve the uncoupled problem
-            initial_neutronics_state = simulation_objects["neut_solver"].solve_static(
-                th_state=simulation_objects["core_state"],
-                th_params=simulation_objects["th_params_primary"],
+            initial_neutronics_state = neut_solver.solve_static(
+                th_state=core_state,
+                th_params=th_params_primary,
                 source=source,
                 override_mode="criticality",
             )
             coupler = SteadyStateCoupler(
-                simulation_objects["th_solver"],
-                simulation_objects["neut_solver"],
-                simulation_objects["neutronic_mode"],
+                th_solver=th_solver,
+                neutronics_solver=neut_solver,
+                mode="criticality",
             )
             (
-                simulation_objects["core_state"],
-                simulation_objects["secondary_state"],
+                coupled_core_state,
+                coupled_secondary_state,
                 final_state,
             ) = coupler.solve(
-                simulation_objects["core_state"],
-                simulation_objects["secondary_state"],
+                th_state_primary=core_state,
+                th_state_secondary=secondary_state,
                 initial_neutronics_state=initial_neutronics_state,
                 source=source,
             )
@@ -74,7 +107,7 @@ def main():
                 len(simulation_objects["secondary_state"].temperature),
             )
 
-            plt.plot(x, simulation_objects["core_state"].temperature, label="Core")
+            plt.plot(x, coupled_core_state.temperature, label="Core")
             plt.xlabel("Position [m]")
             plt.ylabel("Temperature [K]")
             plt.show()
@@ -82,7 +115,7 @@ def main():
 
             plt.plot(
                 x_secondary,
-                simulation_objects["secondary_state"].temperature,
+                coupled_secondary_state.temperature,
                 label="Secondary",
             )
             plt.xlabel("Position [m]")
@@ -220,6 +253,7 @@ def main():
                 )
             # print the final keff
             print(f"Final keff after renormalization: {final_state.keff}")
+            input("Press Enter to continue...")
             # solve the unsteady coupled problem
             unsteady_coupler = UnsteadyCoupler(
                 th_solver=simulation_objects["th_solver"],
