@@ -10,6 +10,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class CoreGeometry:
     core_length: float
@@ -24,6 +25,11 @@ class CoreGeometry:
         self.dx = np.array(
             [self.dx_core] * self.n_cells_core
             + [self.dx_exchanger] * self.n_cells_exchanger
+        )
+        self.x = np.linspace(
+            0,
+            self.core_length + self.exchanger_length,
+            self.n_cells_core + self.n_cells_exchanger,
         )
 
 
