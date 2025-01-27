@@ -11,9 +11,6 @@ from scipy.sparse import bmat
 import scipy.sparse.linalg as spla
 from utils.states import ThermoHydraulicsState, NeutronicsState
 
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # MAGIC NUMBERS
@@ -280,6 +277,7 @@ class ThermoHydraulicsSolver:
         # CAREFUL POWER DENSITY IS ALREADY MULTIPLIED BY THE AREA
         power_source = neutronic_state.power_density
         RHS_vector = np.concatenate([power_source, source_term_secondary])
+        logger.debug(f"Power Source: {neutronic_state.power_density}")
         return RHS_vector
 
     def build_time_dependent_rhs_vector(
@@ -346,9 +344,18 @@ class ThermoHydraulicsSolver:
         )
         T = spla.spsolve(LHS, rhs_vector)
         logger.debug("Static thermo-hydraulic problem solved.")
-        th_state_primary.temperature = T[: self.n_cells_primary]
-        th_state_secondary.temperature = T[self.n_cells_primary :]
-        return th_state_primary, th_state_secondary
+        # initiate new states
+        new_th_state_primary = ThermoHydraulicsState(
+            flow_rate=th_state_primary.flow_rate,
+            temperature=T[: self.n_cells_primary],
+            T_in=th_state_primary.T_in,
+        )
+        new_th_state_secondary = ThermoHydraulicsState(
+            flow_rate=th_state_secondary.flow_rate,
+            temperature=T[self.n_cells_primary :],
+            T_in=th_state_secondary.T_in,
+        )
+        return new_th_state_primary, new_th_state_secondary
 
     def make_time_step(
         self,
