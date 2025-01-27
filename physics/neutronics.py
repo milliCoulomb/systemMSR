@@ -224,7 +224,7 @@ class NeutronicsSolver:
         )  # Lambda * v
         precursor_production = (
             self.build_precursor_production_op(th_state, th_params)
-        ) # nu * Sigma_f * phi * beta * v
+        ) # nu * Sigma_f * phi * beta
         fission_flux = (
             self.build_prompt_fission_op(th_state, th_params)
             * self.params.neutron_velocity
