@@ -55,6 +55,14 @@ class UnsteadyCoupler:
         list_th_secondary = []
         list_neutronics = []
         time_parameters = self.operational_parameters
+        beam_center = time_parameters.accelerator_center
+        beam_width = time_parameters.accelerator_width
+        core_geom = self.th_solver.core_geom
+        source_shape = np.exp(
+                -((core_geom.x - beam_center) ** 2)
+                / (2 * beam_width ** 2)
+            )
+
         for i in range(time_parameters.num_time_steps):
             # at each time step there is a while loop to couple the neutronics and thermohydraulics
             # set the initial values of mass flow rates and temperature for the primary and secondary loops
@@ -63,9 +71,12 @@ class UnsteadyCoupler:
             current_th_state_secondary.T_in = (
                 time_parameters.secondary_inlet_temperature_values[i]
             )
-            current_source = time_parameters.accelerator_intensity_values[i] * np.ones(
-                self.neutronics_solver.n_cells
-            )
+            current_source = time_parameters.accelerator_intensity_values[i] * source_shape
+            if i + 1 < time_parameters.num_time_steps:
+                next_source = time_parameters.accelerator_intensity_values[i + 1] * source_shape
+            else:
+                # if we are at the last time step, we set the source to the last value
+                next_source = time_parameters.accelerator_intensity_values[i] * source_shape
             
             while (
                 residual_flux > RESIDUAL_FLUX
@@ -77,6 +88,7 @@ class UnsteadyCoupler:
                     th_params=self.th_solver.params_primary,
                     dt=time_parameters.time_step,
                     source=current_source,
+                    source_at_next_step=next_source,
                 )
                 # solve thermohydraulics
                 th_primary_step, th_secondary_step = self.th_solver.make_time_step(
