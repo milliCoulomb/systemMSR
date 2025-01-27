@@ -89,12 +89,12 @@ def initialize_simulation(input_deck):
     
     # Initialize thermohydraulics states
     core_state = ThermoHydraulicsState(
-        temperature=np.ones_like(core_geom.dx) * 900.0,
+        temperature=np.ones_like(core_geom.dx) * 800.0,
         flow_rate=pump_primary['rates'][0],
         T_in=0.0,
     )
     secondary_state = ThermoHydraulicsState(
-        temperature=np.ones_like(secondary_geom.dx) * 900.0,
+        temperature=np.ones_like(secondary_geom.dx) * 800.0,
         flow_rate=pump_secondary['rates'][0],
         T_in=temps_sec_in_temp[0],
     )
