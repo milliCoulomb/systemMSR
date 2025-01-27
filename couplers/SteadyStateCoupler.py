@@ -4,15 +4,11 @@ from dataclasses import dataclass
 from typing import List
 import numpy as np
 import logging
-from utils.geometry import CoreGeometry, SecondaryLoopGeometry
 from utils.states import ThermoHydraulicsState, NeutronicsState
 from physics.thermo import ThermoHydraulicsSolver
 from physics.neutronics import NeutronicsSolver
 import copy
 
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # define magic constants (residuals tolerance)
@@ -51,100 +47,74 @@ class SteadyStateCoupler:
         # given initial states, solve the coupled problem
         residual_k = 1.0
         residual_flux = 1.0
-        residual_temperature = 1.0
+        residual_temperature_steady = 1.0
         iteration = 0
 
         # Make deep copies of the states to avoid memory issues
-        th_state_primary = copy.deepcopy(th_state_primary)
-        th_state_secondary = copy.deepcopy(th_state_secondary)
-        initial_neutronics_state = copy.deepcopy(initial_neutronics_state)
+        old_th_state_primary = th_state_primary
+        old_th_state_secondary = th_state_secondary
+        old_neutronics_state = initial_neutronics_state
 
         while (
             residual_k > RESIDUAL_KEFF
             or residual_flux > RESIDUAL_FLUX
             or residual_temperature > RESIDUAL_TEMPERATURE
         ):
-            # solve neutronics first
-            neutronic_step = self.neutronics_solver.solve_static(
-                th_state_primary, self.th_solver.params_primary, source, override_mode=self.mode
+            # Neutronics
+            new_neutronics_state = self.neutronics_solver.solve_static(
+                old_th_state_primary,
+                self.th_solver.params_primary,
+                source,
+                override_mode=self.mode,
             )
-            # solve thermohydraulics
-            th_primary_step, th_secondary_step = self.th_solver.solve_static(
-                th_state_primary=th_state_primary,
-                th_state_secondary=th_state_secondary,
-                neutronic_state=neutronic_step,
+            logger.debug(
+                f"[Iteration {iteration}] keff={new_neutronics_state.keff}, power[150]={new_neutronics_state.power_density[150]}"
             )
-            # calculate residuals
+
+            # Thermohydraulics
+            new_th_primary_state, new_th_secondary_state = self.th_solver.solve_static(
+                old_th_state_primary, old_th_state_secondary, new_neutronics_state
+            )
+            logger.debug(
+                f"[Iteration {iteration}] New T(prim)[0..5] = {new_th_primary_state.temperature[:5]}"
+            )
+            logger.debug(
+                f"[Iteration {iteration}] Old T(prim)[0..5] = {old_th_state_primary.temperature[:5]}"
+            )
+
+            # Residuals
+            diff_p = new_th_primary_state.temperature - old_th_state_primary.temperature
+            diff_s = (
+                new_th_secondary_state.temperature - old_th_state_secondary.temperature
+            )
+            residual_temperature_1 = np.linalg.norm(diff_p) / np.linalg.norm(
+                new_th_primary_state.temperature
+            )
+            residual_temperature_2 = np.linalg.norm(diff_s) / np.linalg.norm(
+                new_th_secondary_state.temperature
+            )
+            residual_temperature = max(residual_temperature_1, residual_temperature_2)
             if self.mode == "criticality":
                 residual_k = (
-                    np.abs(neutronic_step.keff - initial_neutronics_state.keff)
-                    / initial_neutronics_state.keff
+                    abs(new_neutronics_state.keff - old_neutronics_state.keff)
+                    / new_neutronics_state.keff
                 )
             else:
                 residual_k = 0.0
             residual_flux = np.linalg.norm(
-                neutronic_step.phi - initial_neutronics_state.phi
-            ) / np.linalg.norm(initial_neutronics_state.phi)
-            residual_temperature = np.linalg.norm(
-                th_primary_step.temperature - th_state_primary.temperature
-            ) / np.linalg.norm(th_state_primary.temperature)
-            print(residual_temperature)
-            # update states
-            th_state_primary = copy.deepcopy(th_primary_step)
-            th_state_secondary = copy.deepcopy(th_secondary_step)
-            initial_neutronics_state = copy.deepcopy(neutronic_step)
+                new_neutronics_state.phi - old_neutronics_state.phi
+            ) / np.linalg.norm(new_neutronics_state.phi)
+
+            logger.debug(
+                f"[Iteration {iteration}] Temperature diff (primary) first 5 = {diff_p[:5]}"
+            )
             logger.info(
                 f"Residuals: k={residual_k}, flux={residual_flux}, temperature={residual_temperature}"
             )
-            iteration += 1
-        logger.info(f"Converged in {iteration} iterations.")
-        return th_state_primary, th_state_secondary, initial_neutronics_state
 
-    # def solve(
-    #     self,
-    #     th_state_primary: ThermoHydraulicsState,
-    #     th_state_secondary: ThermoHydraulicsState,
-    #     initial_neutronics_state: NeutronicsState,
-    #     source: np.ndarray,
-    # ):
-    #     """
-    #     Solve the steady-state coupled problem.
-    #     """
-    #     # given initial states, solve the coupled problem
-    #     residual_k = 1.0
-    #     residual_flux = 1.0
-    #     residual_temperature = 1.0
-    #     while (
-    #         residual_k > RESIDUAL_KEFF
-    #         or residual_flux > RESIDUAL_FLUX
-    #         or residual_temperature > RESIDUAL_TEMPERATURE
-    #     ):
-    #         # solve neutronics first
-    #         neutronic_step = self.neutronics_solver.solve_static(
-    #             th_state_primary, self.th_solver.params_primary, source=source, override_mode='criticality'
-    #         )
-    #         # solve thermohydraulics
-    #         th_primary_step, th_secondary_step = self.th_solver.solve_static(
-    #             th_state_primary=th_state_primary,
-    #             th_state_secondary=th_state_secondary,
-    #             neutronic_state=neutronic_step,
-    #         )
-    #         # calculate residuals
-    #         residual_k = (
-    #             np.abs(neutronic_step.keff - initial_neutronics_state.keff)
-    #             / initial_neutronics_state.keff
-    #         )
-    #         residual_flux = np.linalg.norm(
-    #             neutronic_step.phi - initial_neutronics_state.phi
-    #         ) / np.linalg.norm(initial_neutronics_state.phi)
-    #         residual_temperature = np.linalg.norm(
-    #             th_primary_step.temperature - th_state_primary.temperature
-    #         ) / np.linalg.norm(th_state_primary.temperature)
-    #         # update states
-    #         th_state_primary = th_primary_step
-    #         th_state_secondary = th_secondary_step
-    #         initial_neutronics_state = neutronic_step
-    #         logger.info(
-    #             f"Residuals: k={residual_k}, flux={residual_flux}, temperature={residual_temperature}"
-    #         )
-    #     return th_state_primary, th_state_secondary, initial_neutronics_state
+            # Overwrite old states
+            old_th_state_primary = copy.deepcopy(new_th_primary_state)
+            old_th_state_secondary = copy.deepcopy(new_th_secondary_state)
+            old_neutronics_state = copy.deepcopy(new_neutronics_state)
+        logger.debug(f"Converged in {iteration} iterations.")
+        return old_th_state_primary, old_th_state_secondary, old_neutronics_state
