@@ -65,6 +65,7 @@ class SimulationModel(BaseModel):
     time_step: float
     mode: str
     neutronic_mode: str
+    turbulence: bool
 
 class InputDeckModel(BaseModel):
     simulation: SimulationModel
