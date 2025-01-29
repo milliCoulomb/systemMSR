@@ -22,6 +22,7 @@ class ThermoHydraulicsParameters:
     rho: float  # Density [kg/m^3]
     cp: float  # Specific heat [J/kg-K]
     k: float  # Thermal conductivity [W/m-K]
+    mu: float  # Dynamic viscosity [Pa-s]
     heat_exchanger_coefficient: float  # [W/m^3-K]
     expansion_coefficient: float  # [1/K]
 
@@ -65,15 +66,13 @@ class ThermoHydraulicsSolver:
         if primary:
             grad = self.method_primary.build_grad(
                 th_state.flow_rate
-                * self.params_primary.cp
-                * np.ones(self.n_cells_primary),
+                * self.params_primary.cp,
                 periodic=periodic,
             )
         else:
             grad = self.method_secondary.build_grad(
                 th_state.flow_rate
-                * self.params_secondary.cp
-                * np.ones(self.n_cells_secondary),
+                * self.params_secondary.cp,
                 periodic=periodic,
             )
         return grad
@@ -258,7 +257,7 @@ class ThermoHydraulicsSolver:
         # therefore we need to modify the RHS vector so that the source term exactly cancels the term in the matrix
         # CAREFUL THIS IS DISCRETIZATION DEPENDENT
         boundary_condition = th_state_secondary.T_in * (
-            th_state_secondary.flow_rate
+            th_state_secondary.flow_rate[0]
             * self.params_secondary.cp
             / self.secondary_geom.dx[0]
             + self.params_secondary.k
@@ -291,7 +290,7 @@ class ThermoHydraulicsSolver:
         Build the right-hand side vector for the time-dependent problem
         """
         boundary_condition = th_state_secondary.T_in * (
-            th_state_secondary.flow_rate
+            th_state_secondary.flow_rate[0]
             * self.params_secondary.cp
             / self.secondary_geom.dx[0]
             + self.params_secondary.k
