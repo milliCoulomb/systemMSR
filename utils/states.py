@@ -8,7 +8,7 @@ import logging
 @dataclass
 class ThermoHydraulicsState:
     temperature: np.ndarray
-    flow_rate: float  # Mass flow rate [kg/s]
+    flow_rate: np.ndarray
     T_in: float  # Inlet temperature [K]
 
 @dataclass
