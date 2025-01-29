@@ -108,7 +108,6 @@ class NeutronicsSolver:
         velocity = (
             th_state.flow_rate
             / (th_params.rho * np.pi * self.geom.core_radius**2)
-            * np.ones_like(self.dx)
         )
         precursor_advection = self.method.build_grad(velocity)
         logger.debug("Removal operator built for the delayed neutron precursors.")
@@ -222,9 +221,9 @@ class NeutronicsSolver:
         decay_precursor = (
             self.build_precursor_decay_op() * self.params.neutron_velocity
         )  # Lambda * v
-        precursor_production = (
-            self.build_precursor_production_op(th_state, th_params)
-        ) # nu * Sigma_f * phi * beta
+        precursor_production = self.build_precursor_production_op(
+            th_state, th_params
+        )  # nu * Sigma_f * phi * beta
         fission_flux = (
             self.build_prompt_fission_op(th_state, th_params)
             * self.params.neutron_velocity
@@ -373,7 +372,13 @@ class NeutronicsSolver:
         )
         _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
         sigma_f = sigma_f * mask
-        pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi
+        pv = (
+            sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi
+            + (source / self.params.nu_photofission)
+            * self.params.kappa
+            * np.pi
+            * self.geom.core_radius**2
+        )
         power = np.sum(pv * self.dx)
         # initiate a new state
         new_neut_state = NeutronicsState(
@@ -465,12 +470,16 @@ class NeutronicsSolver:
             th_state, th_params, source_at_next_step
         )
         phi_C_neutron_source = photofission_source * self.params.neutron_velocity * dt
-        phi_C_neutron_source_next = photofission_source_next * self.params.neutron_velocity * dt
+        phi_C_neutron_source_next = (
+            photofission_source_next * self.params.neutron_velocity * dt
+        )
         LHS = identity - THETA * dt * operator
         RHS = identity + (1 - THETA) * dt * operator
         # solve the system
         source_term = phi_C_neutron_source + phi_C_neutron_source_next
-        phi_c_new = spla.spsolve(LHS, RHS @ np.concatenate([neut_state.phi, neut_state.C]) + source_term)
+        phi_c_new = spla.spsolve(
+            LHS, RHS @ np.concatenate([neut_state.phi, neut_state.C]) + source_term
+        )
         # extract the solution and put it in the state
         phi_new = phi_c_new[: self.n_cells]
         C_new = phi_c_new[self.n_cells :]
@@ -480,7 +489,9 @@ class NeutronicsSolver:
         )
         _, sigma_f, _, _ = self.update_nuclear_parameters(th_state, th_params)
         sigma_f = sigma_f * mask
-        pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi_new
+        pv = sigma_f * self.params.kappa * np.pi * self.geom.core_radius**2 * phi_new + (
+            source / self.params.nu_photofission
+        ) * self.params.kappa * np.pi * self.geom.core_radius**2
         new_power = np.sum(pv * self.dx)
         # initiate a new state
         new_neut_state = NeutronicsState(
@@ -506,7 +517,12 @@ class NeutronicsSolver:
         """
         if self.mode == "criticality":
             return self._make_neutronic_time_step_critical(
-                th_state, th_params, neut_state, dt, np.zeros(self.n_cells), np.zeros(self.n_cells)
+                th_state,
+                th_params,
+                neut_state,
+                dt,
+                np.zeros(self.n_cells),
+                np.zeros(self.n_cells),
             )
         elif self.mode == "source_driven":
             return self._make_neutronic_time_step_source_driven(
