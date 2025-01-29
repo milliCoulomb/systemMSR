@@ -66,6 +66,7 @@ def initialize_simulation(input_deck):
         rho=input_deck.materials.primary_salt["density"],
         cp=input_deck.materials.primary_salt["cp"],
         k=input_deck.materials.primary_salt["k"],
+        mu=input_deck.materials.primary_salt["mu"],
         heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
         expansion_coefficient=input_deck.materials.primary_salt["expansion"],
     )
@@ -73,6 +74,7 @@ def initialize_simulation(input_deck):
         rho=input_deck.materials.secondary_salt["density"],
         cp=input_deck.materials.secondary_salt["cp"],
         k=input_deck.materials.secondary_salt["k"],
+        mu=input_deck.materials.secondary_salt["mu"],
         heat_exchanger_coefficient=input_deck.geometry.heat_exchanger_coefficient,
         expansion_coefficient=input_deck.materials.secondary_salt["expansion"],
     )
@@ -90,12 +92,12 @@ def initialize_simulation(input_deck):
     # Initialize thermohydraulics states
     core_state = ThermoHydraulicsState(
         temperature=np.ones_like(core_geom.dx) * 800.0,
-        flow_rate=pump_primary['rates'][0],
+        flow_rate=pump_primary['rates'][0] * np.ones_like(core_geom.dx),
         T_in=0.0,
     )
     secondary_state = ThermoHydraulicsState(
         temperature=np.ones_like(secondary_geom.dx) * 800.0,
-        flow_rate=pump_secondary['rates'][0],
+        flow_rate=pump_secondary['rates'][0] * np.ones_like(secondary_geom.dx),
         T_in=temps_sec_in_temp[0],
     )
     
@@ -140,6 +142,7 @@ def initialize_simulation(input_deck):
         "time_params": time_params,
         "simulation_mode": input_deck.simulation.mode,
         "neutronic_mode": input_deck.simulation.neutronic_mode,
+        "turbulence_bool": input_deck.simulation.turbulence,
     }
 
 def initialize_pump_schedule(pump_type, input_deck):
