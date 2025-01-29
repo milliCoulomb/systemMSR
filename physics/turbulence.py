@@ -15,13 +15,30 @@ def calculate_typical_length(core_radius, core_length) -> float:
     core_surface = 2 * np.pi * core_radius * core_length
     return core_volume / core_surface
 
-
 def Re(flow_rate, core_radius, core_length, density, viscosity) -> float:
     """
     Calculate the Reynolds number given the nominal flow rate, core radius, core length, density, and viscosity.
     """
     typical_length = calculate_typical_length(core_radius, core_length)
     return (flow_rate[0] / (np.pi * core_radius**2)) * typical_length / (viscosity)
+
+def velocity_calculator(flow_rate, core_radius, density) -> float:
+    """
+    Calculate the velocity given the flow rate and core radius.
+    """
+    return flow_rate[0] / (np.pi * core_radius**2 * density)
+
+def in_core_time(flow_rate, core_radius, core_length, density) -> float:
+    """
+    Calculate the time it takes for the fluid to pass through the core.
+    """
+    return core_length / velocity_calculator(flow_rate, core_radius, density)
+
+def out_core_time(flow_rate, core_radius, out_of_core_length, density) -> float:
+    """
+    Calculate the time it takes for the fluid to pass through the out-of-core region.
+    """
+    return out_of_core_length / velocity_calculator(flow_rate, core_radius, density)
 
 def turbulence_intensity(Re) -> float:
     """
@@ -34,7 +51,7 @@ def turbulence_length_scale(core_radius, core_length) -> float:
     Calculate the turbulence length scale given the core radius and core length.
     """
     typical_length = calculate_typical_length(core_radius, core_length)
-    return 0.07 * typical_length
+    return 0.07 * core_length
 
 def turbulence_process(flow_rate, old_perturbuation, core_radius, core_length, density, viscosity, dt, dx) -> np.ndarray:
     """
