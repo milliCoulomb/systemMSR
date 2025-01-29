@@ -1,46 +1,49 @@
 # input_deck.yaml
 
 simulation:
-  total_time: 70.0          # [s] total simulation time
-  time_step: 0.1e-1            # [s] base time-step
-  mode: "steady_state"          # "transient" or "steady_state"
+  total_time: 50.0          # [s] total simulation time
+  time_step: 0.02e-1            # [s] base time-step
+  mode: "transient"          # "transient" or "steady_state"
   neutronic_mode: "criticality" # "criticality" or "source_driven"
+  turbulence: true          # whether to include turbulence in the simulation
 
 geometry:
-  core_length: 3.0           # [m] length of the core region
-  exchanger_length: 3.0      # [m] length of the heat exchanger
-  core_radius: 0.5           # [m] radius of the core region
-  cooling_loop_first_length: 1.5  # [m] length of primary loop
+  core_length: 2.5           # [m] length of the core region
+  exchanger_length: 9.0      # [m] length of the heat exchanger
+  core_radius: 0.4           # [m] radius of the core region
+  cooling_loop_first_length: 1.0  # [m] length of primary loop
   # then comes the heat exchanger and then the second segment of the cooling loop
   cooling_loop_second_length: 1.5 # [m] length of secondary loop
   secondary_loop_radius: 0.5 # [m] radius of the secondary loop
-  heat_exchanger_coefficient: 5.0e6 # [W/m^3-K] heat transfer coefficient in heat exchanger
-  n_core: 300                 # number of 1D cells in core
-  n_exchanger: 300            # number of 1D cells in heat exchanger
-  n_cooling_loop_first_segment: 150  # number of 1D cells in secondary loop, before heat exchanger
+  heat_exchanger_coefficient: 5.0e5 # [W/m^3-K] heat transfer coefficient in heat exchanger
+  n_core: 250                 # number of 1D cells in core
+  n_exchanger: 900            # number of 1D cells in heat exchanger
+  n_cooling_loop_first_segment: 100  # number of 1D cells in secondary loop, before heat exchanger
   n_cooling_loop_second_segment: 150 # number of 1D cells in secondary loop, after heat exchanger
 
 
 materials:
   primary_salt:
-    density:   2250.0              # [kg/m^3], constant
-    cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-2             # [per kelvin], constant
+    density:   1950.0              # [kg/m^3], constant
+    cp:        940.0              # [J/kg-K], constant
+    expansion: 2.12e-4             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
+    mu:        0.002               # [Pa-s], constant
   secondary_salt:
-    density:   2250.0              # [kg/m^3], constant
-    cp:        1967.0              # [J/kg-K], constant
-    expansion: 2.12e-2             # [per kelvin], constant
+    density:   1950.0              # [kg/m^3], constant
+    cp:        940.0              # [J/kg-K], constant
+    expansion: 2.12e-4             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
+    mu:        0.002               # [Pa-s], constant
 
 nuclear_data:
   diffusion_coefficient: 1.21e-2      # [m]   e.g. D
   absorption_cross_section: 3.76e-1  # [1/m] e.g. Sigma_a
-  fission_cross_section: 1.85e-1     # [1/m] e.g. Sigma_f (1.85e-1)
-  photofission_cross_section: 1.0e-1 # [1/m] e.g. Sigma_phif
+  fission_cross_section: 1.605e-1     # [1/m] e.g. Sigma_f (1.85e-1)
+  photofission_cross_section: 0.8e-1 # [1/m] e.g. Sigma_phif, roughly half of Sigma_f
   nu_fission: 2.4                # average number of neutrons per fission
   nu_phifission: 2.4             # average number of neutrons per photofission
-  beta: 70e-5                   # delayed neutron fraction
+  beta: 300e-5                   # delayed neutron fraction
   decay_constant: 0.1           # [1/s] decay constant of precursor
   power: 300e6            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
@@ -52,40 +55,44 @@ operational_parameters:
     # flow rate should be linearly interpolated between the given points
     schedule:
       - time: 0.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 3500.0           # kg/s
       - time: 20.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 3500.0           # kg/s
       - time: 25.0
-        flow_rate: 2000.0           # kg/s
-      - time: 70.0
-        flow_rate: 2000.0           # kg/s
+        flow_rate: 3500.0           # kg/s
+      - time: 50.0
+        flow_rate: 3500.0           # kg/s
   
   pump_secondary:
     mode: "flow_rate_control"
     schedule:
       - time: 0.0
-        flow_rate: 4000.0            # kg/s
+        flow_rate: 8000.0            # kg/s
       - time: 20.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 8000.0           # kg/s
       - time: 25.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 8000.0           # kg/s
       - time: 45.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 8000.0           # kg/s
       - time: 50.0
-        flow_rate: 4000.0           # kg/s
-      - time: 70.0
-        flow_rate: 4000.0           # kg/s
+        flow_rate: 8000.0           # kg/s
+      # - time: 85.0
+      #   flow_rate: 4000.0           # kg/s
 
   secondary_inlet_temp:
     schedule:
       - time: 0.0
-        temperature: 800.0        # [K]
+        temperature: 783.0        # [K]
       - time: 20.0
-        temperature: 800.0        # [K]
+        temperature: 783.0        # [K]
       - time: 20.5
-        temperature: 800.0        # [K]
-      - time: 70.0
-        temperature: 800.0        # [K]
+        temperature: 783.0        # [K]
+      - time: 50.0
+        temperature: 783.0        # [K]
+      # - time: 71.0
+      #   temperature: 800.0        # [K]
+      # - time: 100.0
+      #   temperature: 700.0        # [K]
     
   accelerator:
     electron_to_gamma: 1.0
@@ -93,14 +100,14 @@ operational_parameters:
     width: 0.1                 # [m] width of gaussian beam
     schedule:
       - time: 0.0
-        intensity: 50.0e18            # [W]
-      - time: 200.0
-        intensity: 50.0            # [W]
-      - time: 250.0
-        intensity: 50.0            # [W]
-      - time: 300.0
-        intensity: 50.0            # [W]
-      - time: 350.0
-        intensity: 50.0            # [W]
-      - time: 500.0
-        intensity: 50.0            # [W]
+        intensity: 1.0e1            # [W]
+      - time: 10.0
+        intensity: 1.0e1           # [W]
+      - time: 15.0
+        intensity: 1.0e16            # [W]
+      - time: 40.0
+        intensity: 1.0e16            # [W]
+      - time: 45.0
+        intensity: 1.0e16            # [W]
+      # - time: 100.0
+      #   intensity: 1.0e16            # [W]
