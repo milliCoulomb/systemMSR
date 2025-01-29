@@ -30,12 +30,6 @@ def setup_logging():
             logging.StreamHandler()  # Also output to console
         ]
     )
-    
-    # Set terminal logging level to DEBUG
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(logging.Formatter(log_format))
-    logging.getLogger().addHandler(console_handler)
 
 
 def main():
@@ -157,6 +151,7 @@ def main():
                 source=source,
                 override_mode="criticality",
             )
+            print(f"Initial keff: {initial_neutronics_state.keff}")
             if initial_neutronics_state.keff > 1.0:
                 raise ValueError(
                     "The source driven mode is not solvable for the given problem (keff > 1.0)"
@@ -262,11 +257,12 @@ def main():
                 initial_th_state_primary=simulation_objects["core_state"],
                 initial_th_state_secondary=simulation_objects["secondary_state"],
                 operational_parameters=simulation_objects["time_params"],
+                turbulence=simulation_objects["turbulence_bool"],
             )
 
             core_states, secondary_states, neutronic_states = unsteady_coupler.solve()
             index_to_start = (
-                np.abs(simulation_objects["time_params"].time_values - 20.0)
+                np.abs(simulation_objects["time_params"].time_values - 0.0)
             ).argmin()
             time = simulation_objects["time_params"].time_values[index_to_start:]
             power = np.array([state.power for state in neutronic_states])[
@@ -274,10 +270,11 @@ def main():
             ]
             flow_rate_secondary = np.array(
                 [state.flow_rate for state in secondary_states]
-            )[index_to_start:]
+            )[index_to_start:][:, 0]
+            # is an array of size (n_cells, n_time_steps)
             flow_rate_primary = np.array([state.flow_rate for state in core_states])[
                 index_to_start:
-            ]
+            ][:, 0]
 
             # Plotting time series data (optional)
             nominal_power = simulation_objects["neut_params"].power
@@ -320,8 +317,139 @@ def main():
             plt.legend()
             plt.show()
             plt.close()
-        elif simulation_objects["neutronics_mode"] == "source_driven":
-            raise ValueError("Transient mode not implemented for source driven mode")
+
+            # save the power and temperature data with the delayed fraction in the name
+            delayed_fraction = simulation_objects["neut_params"].beta
+            np.save(
+                f"power_temperature_data_{delayed_fraction}.npy",
+                (time, power, out_temp, in_temp),
+            )
+
+
+        elif simulation_objects["neutronic_mode"] == "source_driven":
+            # we first override the mode of the neutronics solver and check if the uncoupled problem is solvable
+            beam_center = simulation_objects["time_params"].accelerator_center
+            beam_width = simulation_objects["time_params"].accelerator_width
+            beam_intensity = simulation_objects["time_params"].accelerator_intensity_values[0]
+            # source is a Gaussian distribution of the beam intensity centered at the beam center with a width of the beam width
+            x = np.linspace(
+                0,
+                simulation_objects["core_geom"].core_length
+                + simulation_objects["core_geom"].exchanger_length,
+                simulation_objects["core_geom"].n_cells_core + simulation_objects["core_geom"].n_cells_exchanger,
+            )
+
+            source = beam_intensity * np.exp(
+                -((x - beam_center) ** 2)
+                / (2 * beam_width ** 2)
+            )
+
+            # plot the source
+            plt.plot(x, source)
+            plt.xlabel("Position [m]")
+            plt.ylabel("Gamma flux [n/m^2-s]")
+            plt.title("Source Distribution")
+            plt.show()
+            plt.close()
+            
+            initial_neutronics_state = simulation_objects["neut_solver"].solve_static(
+                th_state=simulation_objects["core_state"],
+                th_params=simulation_objects["th_params_primary"],
+                source=source,
+                override_mode="criticality",
+            )
+            print(f"Initial keff: {initial_neutronics_state.keff}")
+            if initial_neutronics_state.keff > 1.0:
+                raise ValueError(
+                    "The source driven mode is not solvable for the given problem (keff > 1.0)"
+                )
+            coupler = SteadyStateCoupler(
+                simulation_objects["th_solver"],
+                simulation_objects["neut_solver"],
+                simulation_objects["neutronic_mode"],
+            )
+            (
+                coupled_core_state,
+                coupled_secondary_state,
+                coupled_neutronic_state,
+            ) = coupler.solve(
+                simulation_objects["core_state"],
+                simulation_objects["secondary_state"],
+                initial_neutronics_state=initial_neutronics_state,
+                source=source,
+            )
+            if coupled_neutronic_state.keff > 1.0:
+                raise ValueError(
+                    "The source driven mode is not solvable for the given problem (keff > 1.0)"
+                )
+            print("Steady state source driven problem solved, starting transient simulation")
+            print(f"Initial keff: {coupled_neutronic_state.keff}")
+            print(f"Initial power: {coupled_neutronic_state.power / 1e6} MW")
+            input("Press Enter to continue...")
+            # solve the unsteady coupled problem
+            unsteady_coupler = UnsteadyCoupler(
+                th_solver=simulation_objects["th_solver"],
+                neutronics_solver=simulation_objects["neut_solver"],
+                initial_neutronics_state=coupled_neutronic_state,
+                initial_th_state_primary=coupled_core_state,
+                initial_th_state_secondary=coupled_secondary_state,
+                operational_parameters=simulation_objects["time_params"],
+                turbulence=simulation_objects["turbulence_bool"],
+            )
+            core_states, secondary_states, neutronic_states = unsteady_coupler.solve()
+
+            index_to_start = 0
+            time = simulation_objects["time_params"].time_values[index_to_start:]
+            power = np.array([state.power for state in neutronic_states])[
+                index_to_start:
+            ]
+            flow_rate_secondary = np.array(
+                [state.flow_rate for state in secondary_states]
+            )[index_to_start:]
+            flow_rate_primary = np.array([state.flow_rate for state in core_states])[
+                index_to_start:
+            ]
+            accelerator_intensity = np.array(
+                simulation_objects["time_params"].accelerator_intensity_values
+            )[index_to_start:]
+
+            # Plotting time series data (optional)
+            fig, ax1 = plt.subplots()
+            color = "tab:red"
+            ax1.set_xlabel("Time [s]")
+            # show in percentage of nominal power
+            ax1.set_ylabel("Power [MW]", color=color)
+            ax1.plot(time, power / 1e6, color=color, label="Power")
+            ax1.tick_params(axis="y", labelcolor=color)
+            
+            ax2 = ax1.twinx()
+            color = "tab:blue"
+            ax2.set_ylabel("Accelerator Intensity [gamma/m2/s]", color=color)
+            ax2.plot(time, accelerator_intensity, color=color, label="Intensity")
+            ax2.tick_params(axis="y", labelcolor=color)
+            fig.tight_layout()
+            plt.legend(loc="upper left")
+            plt.show()
+            plt.close()
+
+            n_core = 300
+            in_core = 0
+            out_temp = np.array([state.temperature[n_core] for state in core_states])[
+                index_to_start:
+            ]
+            in_temp = np.array([state.temperature[in_core] for state in core_states])[
+                index_to_start:
+            ]
+            plt.plot(time, out_temp, label="Outlet Core Temperature")
+            plt.plot(time, in_temp, label="Inlet Core Temperature")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Temperature [K]")
+            plt.legend()
+            plt.show()
+            plt.close()
+        else:
+            raise ValueError("Invalid neutronics mode")
+            
 
 
 if __name__ == "__main__":
