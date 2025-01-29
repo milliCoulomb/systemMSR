@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from utils.initializer import initialize_simulation
 from couplers.SteadyStateCoupler import SteadyStateCoupler
 from couplers.UnsteadyCoupler import UnsteadyCoupler
+from physics.turbulence import Re, velocity_calculator, in_core_time, out_core_time
 
 # MAGIC CONSTANTS
 NUMBER_OF_RENORMALIZATION_ITERATIONS = 20
@@ -55,7 +56,38 @@ def main():
             core_state = simulation_objects["core_state"]
             secondary_state = simulation_objects["secondary_state"]
             th_params_primary = simulation_objects["th_params_primary"]
-            print(th_params_primary.expansion_coefficient)
+            # calculate the reynolds number
+            reynolds_number = Re(
+                simulation_objects["time_params"].pump_values_primary,
+                simulation_objects["core_geom"].core_radius,
+                simulation_objects["core_geom"].core_length,
+                simulation_objects["th_params_primary"].rho,
+                simulation_objects["th_params_primary"].mu,
+            )
+            print(f"Reynolds number: {reynolds_number}")
+            # calculate the velocity
+            velocity = velocity_calculator(
+                simulation_objects["time_params"].pump_values_primary,
+                simulation_objects["core_geom"].core_radius,
+                simulation_objects["th_params_primary"].rho,
+            )
+            print(f"Velocity: {velocity}")
+            # calculate the time it takes for the fluid to pass through the core
+            core_time = in_core_time(
+                simulation_objects["time_params"].pump_values_primary,
+                simulation_objects["core_geom"].core_radius,
+                simulation_objects["core_geom"].core_length,
+                simulation_objects["th_params_primary"].rho,
+            )
+            print(f"Time to pass through the core: {core_time}")
+            # calculate the out of core time
+            out_core_t = out_core_time(
+                simulation_objects["time_params"].pump_values_primary,
+                simulation_objects["core_geom"].core_radius,
+                simulation_objects["core_geom"].exchanger_length,
+                simulation_objects["th_params_primary"].rho,
+            )
+            print(f"Time to pass through the out of core region: {out_core_t}")
             th_solver = simulation_objects["th_solver"]
             # solve the uncoupled problem
             initial_neutronics_state = neut_solver.solve_static(
@@ -207,6 +239,16 @@ def main():
             raise ValueError("Invalid neutronics mode")
     elif simulation_objects["simulation_mode"] == "transient":
         if simulation_objects["neutronic_mode"] == "criticality":
+            # print the reynolds number
+            reynolds_number = Re(
+                simulation_objects["time_params"].pump_values_primary,
+                simulation_objects["core_geom"].core_radius,
+                simulation_objects["core_geom"].core_length,
+                simulation_objects["th_params_primary"].rho,
+                simulation_objects["th_params_primary"].mu,
+            )
+            print(f"Reynolds number: {reynolds_number}")
+            input("Press Enter to continue...")
             coupler = SteadyStateCoupler(
                 simulation_objects["th_solver"],
                 simulation_objects["neut_solver"],
@@ -286,16 +328,16 @@ def main():
             ax1.plot(time, power / nominal_power * 100, color=color, label="Power")
             ax1.tick_params(axis="y", labelcolor=color)
 
-            ax2 = ax1.twinx()
-            color = "tab:blue"
-            ax2.set_ylabel("Flow Rate [kg/s]", color=color)
-            ax2.plot(
-                time, flow_rate_secondary, color="tab:blue", label="Secondary Flow Rate"
-            )
-            ax2.plot(
-                time, flow_rate_primary, color="tab:green", label="Primary Flow Rate"
-            )
-            ax2.tick_params(axis="y", labelcolor=color)
+            # ax2 = ax1.twinx()
+            # color = "tab:blue"
+            # ax2.set_ylabel("Flow Rate [kg/s]", color=color)
+            # ax2.plot(
+            #     time, flow_rate_secondary, color="tab:blue", label="Secondary Flow Rate"
+            # )
+            # ax2.plot(
+            #     time, flow_rate_primary, color="tab:green", label="Primary Flow Rate"
+            # )
+            # ax2.tick_params(axis="y", labelcolor=color)
 
             fig.tight_layout()
             plt.legend(loc="upper left")
