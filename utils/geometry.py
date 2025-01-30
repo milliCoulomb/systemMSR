@@ -52,3 +52,8 @@ class SecondaryLoopGeometry:
             + [self.dx_exchanger] * self.n_cells_exchanger
             + [self.dx_second_loop] * self.n_cells_second_loop
         )
+        self.x = np.linspace(
+            0,
+            self.first_loop_length + self.exchanger_length + self.second_loop_length,
+            self.n_cells_first_loop + self.n_cells_exchanger + self.n_cells_second_loop,
+        )
