@@ -119,6 +119,15 @@ def initialize_simulation(input_deck):
         accelerator_width=input_deck.operational_parameters.accelerator.width,
     )
 
+    # Initialize post-processing parameters
+    post_processing_params = {
+        "output": input_deck.post_processing.output,
+        "output_dir": input_deck.post_processing.output_dir,
+        "file_prefix": input_deck.post_processing.file_prefix,
+        "output_starting_time": input_deck.post_processing.output_starting_time,
+        "output_quantities": input_deck.post_processing.output_quantities,
+    }
+
     # assess the mode of the simulation, can be "steady-state" or "transient", otherwise raise an error
     if input_deck.simulation.mode.lower() not in ["steady_state", "transient"]:
         raise ValueError("Simulation mode must be 'steady-state' or 'transient'")
@@ -143,6 +152,7 @@ def initialize_simulation(input_deck):
         "simulation_mode": input_deck.simulation.mode,
         "neutronic_mode": input_deck.simulation.neutronic_mode,
         "turbulence_bool": input_deck.simulation.turbulence,
+        "post_processing_params": post_processing_params,
     }
 
 def initialize_pump_schedule(pump_type, input_deck):
