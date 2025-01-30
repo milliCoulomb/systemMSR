@@ -1,9 +1,9 @@
 # input_deck.yaml
 
 simulation:
-  total_time: 50.0          # [s] total simulation time
-  time_step: 0.02e-1            # [s] base time-step
-  mode: "transient"          # "transient" or "steady_state"
+  total_time: 20.0          # [s] total simulation time
+  time_step: 0.1e-1            # [s] base time-step
+  mode: "steady_state"          # "transient" or "steady_state"
   neutronic_mode: "criticality" # "criticality" or "source_driven"
   turbulence: true          # whether to include turbulence in the simulation
 
@@ -26,25 +26,25 @@ materials:
   primary_salt:
     density:   1950.0              # [kg/m^3], constant
     cp:        940.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 20.0e-4             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
     mu:        0.002               # [Pa-s], constant
   secondary_salt:
     density:   1950.0              # [kg/m^3], constant
     cp:        940.0              # [J/kg-K], constant
-    expansion: 2.12e-4             # [per kelvin], constant
+    expansion: 20.0e-4             # [per kelvin], constant
     k:         0.5                 # [W/m-K], constant
     mu:        0.002               # [Pa-s], constant
 
 nuclear_data:
   diffusion_coefficient: 1.21e-2      # [m]   e.g. D
   absorption_cross_section: 3.76e-1  # [1/m] e.g. Sigma_a
-  fission_cross_section: 1.605e-1     # [1/m] e.g. Sigma_f (1.85e-1)
+  fission_cross_section: 1.85e-1     # [1/m] e.g. Sigma_f (1.85e-1)
   photofission_cross_section: 0.8e-1 # [1/m] e.g. Sigma_phif, roughly half of Sigma_f
   nu_fission: 2.4                # average number of neutrons per fission
   nu_phifission: 2.4             # average number of neutrons per photofission
-  beta: 300e-5                   # delayed neutron fraction
-  decay_constant: 0.1           # [1/s] decay constant of precursor
+  beta: 200e-5                   # delayed neutron fraction
+  decay_constant: 0.07           # [1/s] decay constant of precursor
   power: 300e6            # [W] target power of the reactor
   kappa: 3.2e-11                 # Joules per fission
   neutron_velocity: 2.2e3        # [m/s] average neutron velocity
@@ -53,15 +53,16 @@ operational_parameters:
   pump_primary:
     mode: "flow_rate_control"
     # flow rate should be linearly interpolated between the given points
+    # 3500 kg/s at t=0, 3500 kg/s at t=20, 3500 kg/s at t=25, 3500 kg/s at t=50
     schedule:
       - time: 0.0
-        flow_rate: 3500.0           # kg/s
+        flow_rate: 5500.0           # kg/s
       - time: 20.0
-        flow_rate: 3500.0           # kg/s
+        flow_rate: 5500.0           # kg/s
       - time: 25.0
-        flow_rate: 3500.0           # kg/s
+        flow_rate: 5500.0           # kg/s
       - time: 50.0
-        flow_rate: 3500.0           # kg/s
+        flow_rate: 5500.0           # kg/s
   
   pump_secondary:
     mode: "flow_rate_control"
@@ -111,3 +112,19 @@ operational_parameters:
         intensity: 1.0e16            # [W]
       # - time: 100.0
       #   intensity: 1.0e16            # [W]
+
+post_processing:
+  output: true
+  output_dir: "output"
+  file_prefix: "simulation_ARAMIS" # prefix for output files
+  output_starting_time: 0.0
+  output_quantities:
+    core:
+      - temperature: true # written as "PREFIX_PRIMARY_LOOP_TEMPERATURE.npy"
+      - mass_flow_rate: true  # written as "PREFIX_PRIMARY_LOOP_MASS_FLOW_RATE.npy"
+      - power: true # written as "PREFIX_POWER.npy"
+      - neutron_flux: true # written as "PREFIX_NEUTRON_FLUX.npy"
+      - precursor_concentration: true # written as "PREFIX_PRECURSOR_CONCENTRATION.npy"
+    secondary_loop:
+      - temperature: true # written as "PREFIX_SECONDARY_LOOP_TEMPERATURE.npy"
+      - mass_flow_rate: true # written as "PREFIX_SECONDARY_LOOP_MASS_FLOW_RATE.npy"
