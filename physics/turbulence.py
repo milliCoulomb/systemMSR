@@ -51,20 +51,22 @@ def turbulence_length_scale(core_radius, core_length) -> float:
     Calculate the turbulence length scale given the core radius and core length.
     """
     typical_length = calculate_typical_length(core_radius, core_length)
-    return 0.07 * core_length
+    return 0.07 * core_length # this is because there could be recirculation zones in the core
 
 def turbulence_process(flow_rate, old_perturbuation, core_radius, core_length, density, viscosity, dt, dx) -> np.ndarray:
     """
     Given a mass flow rate vector on a mesh at a with a time step dt, it returns the mass flow rate vector at the next time step.
     """
     Re_number = Re(flow_rate, core_radius, core_length, density, viscosity)
-    turbulence_int = turbulence_intensity(Re_number)
+    turbulence_int = turbulence_intensity(Re_number) * 3.0
     # compute the characteristic time scale (ratio of the velocity scale to the length scale)
     turbulence_length = turbulence_length_scale(core_radius, core_length)
     # infer velocity from flow rate
     velocity = flow_rate[0] / (np.pi * core_radius**2 * density)
     # time scale
     time_scale = turbulence_length / velocity
+    if time_scale < dt:
+        raise ValueError("Time scale is smaller than the time step.")
     exp_factor = np.exp(-dt / time_scale) * np.ones_like(flow_rate)
     eta = np.sqrt(1 - exp_factor**2) * np.random.normal(size=flow_rate.shape)
     new_perturbuation = old_perturbuation * exp_factor + eta * turbulence_int
