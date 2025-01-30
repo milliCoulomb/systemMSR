@@ -5,18 +5,22 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel, ValidationError, validator
 
+
 class SchedulePointModel(BaseModel):
     time: float
     flow_rate: Optional[float] = None
     temperature: Optional[float] = None
     intensity: Optional[float] = None
 
+
 class PumpModel(BaseModel):
     mode: str
     schedule: List[SchedulePointModel]
 
+
 class SecondaryInletTempModel(BaseModel):
     schedule: List[SchedulePointModel]
+
 
 class AcceleratorModel(BaseModel):
     schedule: List[SchedulePointModel]
@@ -24,15 +28,18 @@ class AcceleratorModel(BaseModel):
     position: float
     width: float
 
+
 class OperationalParametersModel(BaseModel):
     pump_primary: PumpModel
     pump_secondary: PumpModel
     secondary_inlet_temp: SecondaryInletTempModel
     accelerator: AcceleratorModel
 
+
 class MaterialsModel(BaseModel):
     primary_salt: dict
     secondary_salt: dict
+
 
 class NuclearDataModel(BaseModel):
     diffusion_coefficient: float
@@ -47,6 +54,7 @@ class NuclearDataModel(BaseModel):
     power: float
     neutron_velocity: float
 
+
 class GeometryModel(BaseModel):
     core_length: float
     exchanger_length: float
@@ -60,6 +68,7 @@ class GeometryModel(BaseModel):
     n_cooling_loop_first_segment: int
     n_cooling_loop_second_segment: int
 
+
 class SimulationModel(BaseModel):
     total_time: float
     time_step: float
@@ -67,12 +76,23 @@ class SimulationModel(BaseModel):
     neutronic_mode: str
     turbulence: bool
 
+
+class PostProcessingModel(BaseModel):
+    output: bool
+    output_dir: str
+    file_prefix: str
+    output_starting_time: float
+    output_quantities: dict
+
+
 class InputDeckModel(BaseModel):
     simulation: SimulationModel
     geometry: GeometryModel
     materials: MaterialsModel
     nuclear_data: NuclearDataModel
     operational_parameters: OperationalParametersModel
+    post_processing: PostProcessingModel
+
 
 @dataclass
 class InputDeck:
@@ -81,23 +101,25 @@ class InputDeck:
     materials: MaterialsModel
     nuclear_data: NuclearDataModel
     operational_parameters: OperationalParametersModel
+    post_processing: PostProcessingModel
 
     @staticmethod
-    def from_yaml(file_path: str) -> 'InputDeck':
-        with open(file_path, 'r') as f:
+    def from_yaml(file_path: str) -> "InputDeck":
+        with open(file_path, "r") as f:
             data = yaml.safe_load(f)
-        
+
         try:
             input_model = InputDeckModel(**data)
         except ValidationError as e:
             print("Input Deck Validation Error:")
             print(e.json())
             raise e
-        
+
         return InputDeck(
             simulation=input_model.simulation,
             geometry=input_model.geometry,
             materials=input_model.materials,
             nuclear_data=input_model.nuclear_data,
-            operational_parameters=input_model.operational_parameters
+            operational_parameters=input_model.operational_parameters,
+            post_processing=input_model.post_processing,
         )
